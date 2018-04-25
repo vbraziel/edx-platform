@@ -1969,6 +1969,8 @@ CREATE TABLE `dark_lang_darklangconfig` (
   `change_date` datetime(6) NOT NULL,
   `enabled` tinyint(1) NOT NULL,
   `released_languages` longtext NOT NULL,
+  `enable_beta_languages` tinyint(0) NOT NULL,
+  `beta_languages` longtext NOT NULL,
   `changed_by_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `dark_lang_darklan_changed_by_id_7e1defb1121d58b8_fk_auth_user_id` (`changed_by_id`),
