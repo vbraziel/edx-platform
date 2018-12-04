@@ -933,3 +933,59 @@ class ProblemMetaUngradedTest(ProblemsTest):
         problem_page = ProblemPage(self.browser)
         self.assertEqual(problem_page.problem_name, 'TEST PROBLEM')
         self.assertEqual(problem_page.problem_progress_graded_value, "1 point possible (ungraded)")
+
+
+class FormulaProblemTest(ProblemsTest):
+
+    def get_problem(self):
+        """
+                Problem structure
+        """
+        xml = dedent("""
+                    <problem>
+    <formularesponse type="ci" samples="R_1,R_2,R_3@1,2,3:3,4,5#10" answer="R_1*R_2/R_3">
+        <p>You can use this template as a guide to the OLX markup to use for math expression problems. Edit this component to replace the example with your own assessment.</p>
+        <label>Add the question text, or prompt, here. This text is required. Example: Write an expression for the product of R_1, R_2, and the inverse of R_3.</label>
+        <description>You can add an optional tip or note related to the prompt like this. Example: To test this example, the correct answer is R_1*R_2/R_3</description>
+        <responseparam type="tolerance" default="0.00001"/>
+        <formulaequationinput size="40"/>
+    </formularesponse>
+                    </problem>
+                """)
+        return XBlockFixtureDesc('problem', 'TEST PROBLEM', data=xml, metadata={'show_reset_button': True})
+
+    def test_reset_problem_after_incorrect_submission(self):
+
+        self.courseware_page.visit()
+        problem_page = ProblemPage(self.browser)
+        problem_page.fill_answer_numerical('R_1*R_2')
+        problem_page.verify_mathjax_rendered_in_preview()
+        problem_page.click_submit()
+        self.assertFalse(problem_page.simpleprob_is_correct())
+        problem_page.click_reset()
+        self.assertEqual(problem_page.get_numerical_input_value, '')
+
+    def test_reset_button_not_rendered_after_correct_submission(self):
+
+        self.courseware_page.visit()
+        problem_page = ProblemPage(self.browser)
+        problem_page.fill_answer_numerical('R_1*R_2/R_3')
+        problem_page.verify_mathjax_rendered_in_preview()
+        problem_page.click_submit()
+        self.assertTrue(problem_page.simpleprob_is_correct())
+        self.assertFalse(problem_page.is_reset_button_present())
+
+    def test_reset_problem_after_changing_correctness(self):
+
+        self.courseware_page.visit()
+        problem_page = ProblemPage(self.browser)
+        problem_page.fill_answer_numerical('R_1*R_2/R_3')
+        problem_page.verify_mathjax_rendered_in_preview()
+        problem_page.click_submit()
+        self.assertTrue(problem_page.simpleprob_is_correct())
+        self.assertFalse(problem_page.is_reset_button_present())
+        problem_page.fill_answer_numerical('R_1/R_3')
+        problem_page.click_submit()
+        self.assertFalse(problem_page.simpleprob_is_correct())
+        problem_page.click_reset()
+        self.assertEqual(problem_page.get_numerical_input_value, '')

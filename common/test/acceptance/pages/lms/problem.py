@@ -90,6 +90,18 @@ class ProblemPage(PageObject):
             description="MathJax rendered in problem body"
         )
 
+    def verify_mathjax_rendered_in_preview(self):
+
+        def mathjax_present():
+            """ Returns True if MathJax css is present inside the preview """
+            mathjax_container = self.q(css="div.problem div .MathJax_SVG")
+            return mathjax_container.visible and mathjax_container.present
+
+        self.wait_for(
+            mathjax_present,
+            description="MathJax rendered in problem body"
+        )
+
     def verify_mathjax_rendered_in_hint(self):
         """
         Check that MathJax have been rendered in problem hint
@@ -126,6 +138,11 @@ class ProblemPage(PageObject):
         self.q(css='div.problem div.inputtype input').fill(text)
         self.wait_for_element_invisibility('.loading', 'wait for loading icon to disappear')
         self.wait_for_ajax()
+
+    @property
+    def get_numerical_input_value(self):
+
+        return self.q(css='div.problem div.inputtype input').text[0]
 
     def click_submit(self):
         """
