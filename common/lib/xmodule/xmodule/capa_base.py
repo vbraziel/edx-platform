@@ -12,11 +12,6 @@ import sys
 import traceback
 
 from django.conf import settings
-# We don't want to force a dependency on datadog, so make the import conditional
-try:
-    import dogstats_wrapper as dog_stats_api
-except ImportError:
-    dog_stats_api = None
 from pytz import utc
 from django.utils.encoding import smart_text
 from six import text_type
@@ -1179,16 +1174,12 @@ class CapaMixin(ScorableXBlockMixin, CapaFields):
         if self.closed():
             event_info['failure'] = 'closed'
             self.track_function_unmask('problem_check_fail', event_info)
-            if dog_stats_api:
-                dog_stats_api.increment(metric_name('checks'), tags=[u'result:failed', u'failure:closed'])
             raise NotFoundError(_("Problem is closed."))
 
         # Problem submitted. Student should reset before checking again
         if self.done and self.rerandomize == RANDOMIZATION.ALWAYS:
             event_info['failure'] = 'unreset'
             self.track_function_unmask('problem_check_fail', event_info)
-            if dog_stats_api:
-                dog_stats_api.increment(metric_name('checks'), tags=[u'result:failed', u'failure:unreset'])
             raise NotFoundError(_("Problem must be reset before it can be submitted again."))
 
         # Problem queued. Students must wait a specified waittime before they are allowed to submit
@@ -1284,18 +1275,6 @@ class CapaMixin(ScorableXBlockMixin, CapaFields):
         event_info['attempts'] = self.attempts
         event_info['submission'] = self.get_submission_metadata_safe(answers_without_files, correct_map)
         self.track_function_unmask('problem_check', event_info)
-
-        if dog_stats_api:
-            dog_stats_api.increment(metric_name('checks'), tags=[u'result:success'])
-            if published_grade['max_grade'] != 0:
-                dog_stats_api.histogram(
-                    metric_name('correct_pct'),
-                    float(published_grade['grade']) / published_grade['max_grade'],
-                )
-            dog_stats_api.histogram(
-                metric_name('attempts'),
-                self.attempts,
-            )
 
         # render problem into HTML
         html = self.get_problem_html(encapsulate=False, submit_notification=True)

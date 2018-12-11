@@ -7,7 +7,6 @@ from uuid import uuid4
 import requests
 from django.utils.translation import get_language
 
-import dogstats_wrapper as dog_stats_api
 from .settings import SERVICE_HOST as COMMENTS_SERVICE
 
 log = logging.getLogger(__name__)
@@ -33,8 +32,6 @@ def extract(dic, keys):
 @contextmanager
 def request_timer(request_id, method, url, tags=None):
     start = time()
-    with dog_stats_api.timer('comment_client.request.time', tags=tags):
-        yield
     end = time()
     duration = end - start
 
@@ -97,7 +94,6 @@ def perform_request(method, url, data_or_params=None, raw=False,
     else:
         metric_tags.append(u'result:success')
 
-    dog_stats_api.increment('comment_client.request.count', tags=metric_tags)
 
     if 200 < response.status_code < 500:
         raise CommentClientRequestError(response.text, response.status_code)
@@ -118,22 +114,6 @@ def perform_request(method, url, data_or_params=None, raw=False,
                         request_id=request_id,
                         content=response.text[:100]
                     )
-                )
-            if paged_results:
-                dog_stats_api.histogram(
-                    'comment_client.request.paged.result_count',
-                    value=len(data.get('collection', [])),
-                    tags=metric_tags
-                )
-                dog_stats_api.histogram(
-                    'comment_client.request.paged.page',
-                    value=data.get('page', 1),
-                    tags=metric_tags
-                )
-                dog_stats_api.histogram(
-                    'comment_client.request.paged.num_pages',
-                    value=data.get('num_pages', 1),
-                    tags=metric_tags
                 )
             return data
 
