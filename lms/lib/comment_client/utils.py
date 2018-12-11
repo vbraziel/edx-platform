@@ -29,23 +29,6 @@ def extract(dic, keys):
         return strip_none({k: dic.get(k) for k in keys})
 
 
-@contextmanager
-def request_timer(request_id, method, url, tags=None):
-    start = time()
-    end = time()
-    duration = end - start
-
-    log.info(
-        u"comment_client_request_log: request_id={request_id}, method={method}, "
-        u"url={url}, duration={duration}".format(
-            request_id=request_id,
-            method=method,
-            url=url,
-            duration=duration
-        )
-    )
-
-
 def perform_request(method, url, data_or_params=None, raw=False,
                     metric_action=None, metric_tags=None, paged_results=False):
     # To avoid dependency conflict
@@ -78,15 +61,14 @@ def perform_request(method, url, data_or_params=None, raw=False,
         data = None
         params = data_or_params.copy()
         params.update(request_id_dict)
-    with request_timer(request_id, method, url, metric_tags):
-        response = requests.request(
-            method,
-            url,
-            data=data,
-            params=params,
-            headers=headers,
-            timeout=config.connection_timeout
-        )
+    response = requests.request(
+        method,
+        url,
+        data=data,
+        params=params,
+        headers=headers,
+        timeout=config.connection_timeout
+    )
 
     metric_tags.append(u'status_code:{}'.format(response.status_code))
     if response.status_code > 200:
