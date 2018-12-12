@@ -76,7 +76,6 @@ def perform_request(method, url, data_or_params=None, raw=False,
     else:
         metric_tags.append(u'result:success')
 
-
     if 200 < response.status_code < 500:
         raise CommentClientRequestError(response.text, response.status_code)
     # Heroku returns a 503 when an application is in maintenance mode

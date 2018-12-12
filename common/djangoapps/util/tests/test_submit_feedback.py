@@ -104,7 +104,7 @@ class SubmitFeedbackTest(EnterpriseServiceMockMixin, TestCase):
         req.user = user
         return views.submit_feedback(req)
 
-    def _assert_bad_request(self, response, field, zendesk_mock_class ):
+    def _assert_bad_request(self, response, field, zendesk_mock_class):
         """
         Assert that the given `response` contains correct failure data.
 
