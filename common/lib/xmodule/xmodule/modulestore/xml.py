@@ -410,7 +410,7 @@ class XMLModuleStore(ModuleStoreReadBase):
         '''
         return '<%s data_dir=%r, %d courselikes, %d modules>' % (
             self.__class__.__name__, self.data_dir, len(self.courses), len(self.modules)
-        )
+        )  ## xss-lint: disable=python-interpolate-html
 
     @staticmethod
     def id_from_descriptor(descriptor):

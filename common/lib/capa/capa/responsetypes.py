@@ -582,7 +582,7 @@ class LoncapaResponse(object):
         # First try wrapping the text in a <div> and parsing
         # it as an XHTML tree
         try:
-            response_msg_div = etree.XML('<div>%s</div>' % str(response_msg))
+            response_msg_div = etree.XML(HTML('<div>{}</div>').format(str(response_msg)))
 
         # If we can't do that, create the <div> and set the message
         # as the text of the <div>
@@ -2067,7 +2067,7 @@ class StringResponse(LoncapaResponse):
         _ = self.capa_system.i18n.ugettext
         # Translators: Separator used in StringResponse to display multiple answers.
         # Example: "Answer: Answer_1 or Answer_2 or Answer_3".
-        separator = u' <b>{}</b> '.format(_('or'))
+        separator = HTML(' <b>{}</b> ').format(_('or'))
         return {self.answer_id: separator.join(self.correct_answer)}
 
 #-----------------------------------------------------------------------------
@@ -2206,7 +2206,7 @@ class CustomResponse(LoncapaResponse):
             # default to no error message on empty answer (to be consistent with other
             # responsetypes) but allow author to still have the old behavior by setting
             # empty_answer_err attribute
-            msg = (u'<span class="inline-error">{0}</span>'.format(_(u'No answer entered!'))
+            msg = HTML((u'<span class="inline-error">{0}</span>').format(_(u'No answer entered!'))
                    if self.xml.get('empty_answer_err') else '')
             return CorrectMap(idset[0], 'incorrect', msg=msg)
 
@@ -2461,7 +2461,7 @@ class CustomResponse(LoncapaResponse):
 
             # When we parse *msg* using etree, there needs to be a root
             # element, so we wrap the *msg* text in <html> tags
-            msg = '<html>' + msg + '</html>'
+            msg = HTML('<html>{msg}</html>').format(msg=msg)
 
             # Replace < characters
             msg = msg.replace('&#60;', '&lt;')
@@ -2976,7 +2976,8 @@ class ExternalResponse(LoncapaResponse):
                     self.answer_ids), ['incorrect'] * len(idset))))
                 cmap.set_property(
                     self.answer_ids[0], 'msg',
-                    '<span class="inline-error">%s</span>' % str(err).replace('<', '&lt;'))
+                    Text('<span class="inline-error">{}</span>').format(str(err))
+                )
                 return cmap
 
         awd = rxml.find('awarddetail').text
