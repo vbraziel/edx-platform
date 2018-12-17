@@ -524,6 +524,7 @@ class Order(models.Model):
             segment.track(self.user.id, event_name, {
                 'orderId': self.id,
                 'total': str(self.total_cost),
+                'revenue': str(self.total_cost),
                 'currency': self.currency,
                 'products': [item.analytics_data() for item in orderitems]
             })
