@@ -2207,7 +2207,7 @@ class CustomResponse(LoncapaResponse):
             # responsetypes) but allow author to still have the old behavior by setting
             # empty_answer_err attribute
             msg = HTML((u'<span class="inline-error">{0}</span>').format(_(u'No answer entered!'))
-                   if self.xml.get('empty_answer_err') else '')
+                        if self.xml.get('empty_answer_err') else '')
             return CorrectMap(idset[0], 'incorrect', msg=msg)
 
         # NOTE: correct = 'unknown' could be dangerous. Inputtypes such as textline are

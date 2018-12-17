@@ -268,8 +268,8 @@ class CapaMixin(ScorableXBlockMixin, CapaFields):
                 # TODO (vshnayder): This logic should be general, not here--and may
                 # want to preserve the data instead of replacing it.
                 # e.g. in the CMS
-                msg = u'<p>{msg}</p>'.format(msg=cgi.escape(msg))
-                msg += u'<p><pre>{tb}</pre></p>'.format(
+                msg = HTML(u'<p>{msg}</p>').format(msg=cgi.escape(msg))
+                msg += HTML(u'<p><pre>{tb}</pre></p>').format(
                     # just the traceback, no message - it is already present above
                     tb=cgi.escape(
                         u''.join(
@@ -280,8 +280,8 @@ class CapaMixin(ScorableXBlockMixin, CapaFields):
                 )
                 # create a dummy problem with error message instead of failing
                 problem_text = (
-                    u'<problem><text><span class="inline-error">'
-                    u'Problem {url} has an error:</span>{msg}</text></problem>'.format(
+                    HTML(u'<problem><text><span class="inline-error">'
+                    u'Problem {url} has an error:</span>{msg}</text></problem>').format(
                         url=text_type(self.location),
                         msg=msg,
                     )
