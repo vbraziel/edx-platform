@@ -1,0 +1,21 @@
+.course-expiration-message {
+    margin: $baseline auto;
+    max-width: $text-width-readability-max;
+    background-color: #cce5ff;
+    padding: 20px;
+    border: 1px solid #b8d9ff;
+    border-radius: 2px;
+    box-sizing: border-box;
+
+    a:not(.btn) {
+        font-weight: bold;
+        text-decoration: underline;
+        color: #005686;
+    }
+    & + .page-content{
+        margin-top: 0;
+        padding-top: 0;
+        font-size: 44px !important;
+    }
+}
+

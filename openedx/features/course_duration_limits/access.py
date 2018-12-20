@@ -4,6 +4,7 @@ Contains code related to computing content gating course duration limits
 and course access based on these limits.
 """
 from datetime import timedelta
+import textwrap
 
 from django.utils import timezone
 from django.utils.translation import get_language, ugettext as _
@@ -18,9 +19,9 @@ from lms.djangoapps.courseware.date_summary import verified_upgrade_deadline_lin
 from lms.djangoapps.courseware.masquerade import get_course_masquerade, is_masquerading_as_student
 from openedx.core.djangoapps.catalog.utils import get_course_run_details
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from openedx.core.djangoapps.util.user_messages import PageLevelMessages
 from openedx.core.djangolib.markup import HTML, Text
 from openedx.features.course_duration_limits.models import CourseDurationLimitConfig
+from web_fragments.fragment import Fragment
 
 MIN_DURATION = timedelta(weeks=4)
 MAX_DURATION = timedelta(weeks=12)
@@ -111,29 +112,25 @@ def check_course_expired(user, course):
 
     return ACCESS_GRANTED
 
-
-def register_course_expired_message(request, course):
+def generate_course_expired_message(user, course):
     """
-    Add a banner notifying the user of the user course expiration date if it exists.
+    Generate the message for the user course expiration date if it exists.
     """
-    if not CourseDurationLimitConfig.enabled_for_enrollment(user=request.user, course_key=course.id):
+    if not CourseDurationLimitConfig.enabled_for_enrollment(user=user, course_key=course.id):
         return
 
-    expiration_date = get_user_course_expiration_date(request.user, course)
+    expiration_date = get_user_course_expiration_date(user, course)
     if not expiration_date:
         return
 
-    if is_masquerading_as_student(request.user, course.id) and timezone.now() > expiration_date:
+    if is_masquerading_as_student(user, course.id) and timezone.now() > expiration_date:
         upgrade_message = _('This learner does not have access to this course. '
                             'Their access expired on {expiration_date}.')
-        PageLevelMessages.register_warning_message(
-            request,
-            HTML(upgrade_message).format(
-                expiration_date=strftime_localized(expiration_date, '%b. %-d, %Y')
-            )
+        return HTML(upgrade_message).format(
+            expiration_date=strftime_localized(expiration_date, '%b. %-d, %Y')
         )
     else:
-        enrollment = CourseEnrollment.get_enrollment(request.user, course.id)
+        enrollment = CourseEnrollment.get_enrollment(user, course.id)
         if enrollment is None:
             return
 
@@ -163,20 +160,43 @@ def register_course_expired_message(request, course):
             formatted_expiration_date = strftime_localized(expiration_date, '%b. %-d, %Y')
             formatted_upgrade_deadline = strftime_localized(upgrade_deadline, '%b. %-d, %Y')
 
-        PageLevelMessages.register_info_message(
-            request,
-            Text(full_message).format(
-                a_open=HTML('<a href="{upgrade_link}">').format(
-                    upgrade_link=verified_upgrade_deadline_link(user=request.user, course=course)
-                ),
-                sronly_span_open=HTML('<span class="sr-only">'),
-                sighted_only_span_open=HTML('<span aria-hidden="true">'),
-                span_close=HTML('</span>'),
-                a_close=HTML('</a>'),
-                expiration_date=formatted_expiration_date,
-                strong_open=HTML('<strong>'),
-                strong_close=HTML('</strong>'),
-                line_break=HTML('<br>'),
-                upgrade_deadline=formatted_upgrade_deadline
-            )
+        return Text(full_message).format(
+            a_open=HTML('<a href="{upgrade_link}">').format(
+                upgrade_link=verified_upgrade_deadline_link(user=user, course=course)
+            ),
+            sronly_span_open=HTML('<span class="sr-only">'),
+            sighted_only_span_open=HTML('<span aria-hidden="true">'),
+            span_close=HTML('</span>'),
+            a_close=HTML('</a>'),
+            expiration_date=formatted_expiration_date,
+            strong_open=HTML('<strong>'),
+            strong_close=HTML('</strong>'),
+            line_break=HTML('<br>'),
+            upgrade_deadline=formatted_upgrade_deadline
         )
+
+def generate_course_expired_fragment(user, course):
+    message = generate_course_expired_message(user, course)
+    if message:
+        return Fragment(textwrap.dedent(u"""\
+            <div class="course-expiration-message">{}</div>
+        """).format(message))
+
+def course_expiration_wrapper(user, block, view, frag, context):  # pylint: disable=W0613
+    """
+    An XBlock wrapper that prepends a message to the beginning of a vertical if
+    a user's course is about to expire.
+    """
+    if block.category != "vertical":
+        return frag
+
+    course = CourseOverview.get_from_id(block.course_id)
+    course_expiration_fragment = generate_course_expired_fragment(user, course)
+
+    if not course_expiration_fragment:
+        return frag
+
+    course_expiration_fragment.add_content(frag.content)
+    course_expiration_fragment.add_fragment_resources(frag)
+
+    return course_expiration_fragment
