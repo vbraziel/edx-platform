@@ -409,7 +409,7 @@ class XMLModuleStore(ModuleStoreReadBase):
         String representation - for debugging
         '''
         return '<%s data_dir=%r, %d courselikes, %d modules>' % (
-            self.__class__.__name__, self.data_dir, len(self.courses), len(self.modules) # xss-lint: disable=python-interpolate-html
+            self.__class__.__name__, self.data_dir, len(self.courses), len(self.modules)  # xss-lint: disable=python-interpolate-html
         )
 
     @staticmethod

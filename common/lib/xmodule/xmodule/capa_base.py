@@ -281,7 +281,7 @@ class CapaMixin(ScorableXBlockMixin, CapaFields):
                 # create a dummy problem with error message instead of failing
                 problem_text = (
                     HTML(u'<problem><text><span class="inline-error">'
-                    u'Problem {url} has an error:</span>{msg}</text></problem>').format(
+                         u'Problem {url} has an error:</span>{msg}</text></problem>').format(
                         url=text_type(self.location),
                         msg=msg,
                     )
