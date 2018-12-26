@@ -4,13 +4,12 @@ Contains code related to computing content gating course duration limits
 and course access based on these limits.
 """
 from datetime import timedelta
-import textwrap
 
 from django.utils import timezone
 from django.utils.translation import get_language, ugettext as _
 
 from student.models import CourseEnrollment
-from util.date_utils import DEFAULT_SHORT_DATE_FORMAT, strftime_localized
+from util.date_utils import strftime_localized
 
 from course_modes.models import CourseMode
 from lms.djangoapps.courseware.access_response import AccessError
@@ -112,6 +111,7 @@ def check_course_expired(user, course):
 
     return ACCESS_GRANTED
 
+
 def generate_course_expired_message(user, course):
     """
     Generate the message for the user course expiration date if it exists.
@@ -175,12 +175,14 @@ def generate_course_expired_message(user, course):
             upgrade_deadline=formatted_upgrade_deadline
         )
 
+
 def generate_course_expired_fragment(user, course):
     message = generate_course_expired_message(user, course)
     if message:
-        return Fragment(textwrap.dedent(u"""\
+        return Fragment(u"""\
             <div class="course-expiration-message">{}</div>
-        """).format(message))
+        """.format(message))
+
 
 def course_expiration_wrapper(user, block, view, frag, context):  # pylint: disable=W0613
     """
