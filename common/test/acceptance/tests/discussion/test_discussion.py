@@ -3,6 +3,7 @@ Tests for discussion pages
 """
 
 import datetime
+import time
 from unittest import skip
 from uuid import uuid4
 
@@ -960,6 +961,7 @@ class DiscussionEditorPreviewTest(UniqueCourseTest):
         self.page = DiscussionTabHomePage(self.browser, self.course_id)
         self.page.visit()
         self.page.click_new_post_button()
+        time.sleep(5)
 
     def test_text_rendering(self):
         """When I type plain text into the editor, it should be rendered as plain text in the preview box"""
