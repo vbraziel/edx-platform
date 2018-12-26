@@ -160,7 +160,7 @@ def generate_course_expired_message(user, course):
             formatted_expiration_date = strftime_localized(expiration_date, '%b. %-d, %Y')
             formatted_upgrade_deadline = strftime_localized(upgrade_deadline, '%b. %-d, %Y')
 
-        return Text(full_message).format(
+        return HTML(full_message).format(
             a_open=HTML('<a href="{upgrade_link}">').format(
                 upgrade_link=verified_upgrade_deadline_link(user=user, course=course)
             ),
@@ -179,9 +179,9 @@ def generate_course_expired_message(user, course):
 def generate_course_expired_fragment(user, course):
     message = generate_course_expired_message(user, course)
     if message:
-        return Fragment(u"""\
+        return Fragment(HTML(u"""\
             <div class="course-expiration-message">{}</div>
-        """.format(message))
+        """).format(message))
 
 
 def course_expiration_wrapper(user, block, view, frag, context):  # pylint: disable=W0613
