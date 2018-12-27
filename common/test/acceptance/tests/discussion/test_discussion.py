@@ -1003,6 +1003,21 @@ class DiscussionEditorPreviewTest(UniqueCourseTest):
         )
         self.assertEqual(self.page.get_new_post_preview_text(), 'Text line 1\nText line 2')
 
+    def test_inline_mathjax_rendering_in_order(self):
+        """
+        Tests the order of Post body content when inline Mathjax is used.
+
+        With inline mathjax expressions, the text content doesn't break into new lines at the places of
+        mathjax expressions.
+        """
+        self.page.set_new_post_editor_value(
+            'Text line 1 \n'
+            '$e[n]=d_1$ \n'
+            'Text line 2 \n'
+            '$e[n]=d_2$'
+        )
+        self.assertEqual(self.page.get_new_post_preview_text('.wmd-preview > p'), 'Text line 1 Text line 2')
+
     def test_mathjax_not_rendered_after_post_cancel(self):
         """
         Tests that mathjax is not rendered when we cancel the post

@@ -425,6 +425,18 @@ class ProblemPage(PageObject):
         """
         return self.q(css="div.problem div.inputtype div.correct span.status").is_present()
 
+    def get_simpleprob_correctness(self):
+        """
+        Checks if a simple problem is correct or not.
+
+        Given a simple problem, the method returns True if correct, and False if incorrect
+        """
+
+        if self.simpleprob_is_correct():
+            return True
+        elif self.simpleprob_is_incorrect():
+            return False
+
     def simpleprob_is_partially_correct(self):
         """
         Is there a "partially correct" status showing? Works with simple problem types.

@@ -5,6 +5,7 @@ Bok choy acceptance tests for problems in the LMS
 See also old lettuce tests in lms/djangoapps/courseware/features/problems.feature
 """
 from textwrap import dedent
+import ddt
 
 from common.test.acceptance.fixtures.course import CourseFixture, XBlockFixtureDesc
 from common.test.acceptance.pages.common.auto_auth import AutoAuthPage
@@ -935,6 +936,7 @@ class ProblemMetaUngradedTest(ProblemsTest):
         self.assertEqual(problem_page.problem_progress_graded_value, "1 point possible (ungraded)")
 
 
+@ddt.ddt
 class FormulaProblemTest(ProblemsTest):
     """
     Test Class to verify the formula problem on LMS
@@ -942,7 +944,7 @@ class FormulaProblemTest(ProblemsTest):
 
     def get_problem(self):
         """
-                Problem structure
+        rerandomize: always and show_reset_button: True will show reset button, regardless the submission.
         """
         xml = dedent("""
                     <problem>
@@ -955,49 +957,64 @@ class FormulaProblemTest(ProblemsTest):
     </formularesponse>
                     </problem>
                 """)
-        return XBlockFixtureDesc('problem', 'TEST PROBLEM', data=xml, metadata={'show_reset_button': True})
+        return XBlockFixtureDesc('problem', 'TEST PROBLEM', data=xml, metadata={'show_reset_button': True, 'rerandomize': 'always'})
 
-    def test_reset_problem_after_incorrect_submission(self):
+    @ddt.data(
+        ('R_1*R_2', False),
+        ('R_1*R_2/R_3', True)
+    )
+    @ddt.unpack
+    def test_reset_problem_after_submission(self, input_value, correctness):
         """
-        Test reset button works after incorrect submission
+        Test reset button works after the submission
         """
-
         self.courseware_page.visit()
         problem_page = ProblemPage(self.browser)
-        problem_page.fill_answer_numerical('R_1*R_2')
+        problem_page.fill_answer_numerical(input_value)
         problem_page.verify_mathjax_rendered_in_preview()
         problem_page.click_submit()
-        self.assertFalse(problem_page.simpleprob_is_correct())
+        self.assertEqual(problem_page.get_simpleprob_correctness(), correctness)
+        self.assertTrue(problem_page.is_reset_button_present())
         problem_page.click_reset()
         self.assertEqual(problem_page.get_numerical_input_value, '')
 
-    def test_reset_button_not_rendered_after_correct_submission(self):
+    @ddt.data(
+        ('R_1*R_2', False, '0/1 point (ungraded)', '0/1 point (ungraded)'),
+        ('R_1*R_2/R_3', True, '1/1 point (ungraded)', '0/1 point (ungraded)')
+    )
+    @ddt.unpack
+    def test_score_reset_after_resetting_problem(self, input_value, correctness, score_before_reset, score_after_reset):
         """
-        Test reset button is not rendered after the correct submission
+        Test score is reset after resetting the formula problem
         """
-
         self.courseware_page.visit()
         problem_page = ProblemPage(self.browser)
-        problem_page.fill_answer_numerical('R_1*R_2/R_3')
+        problem_page.fill_answer_numerical(input_value)
         problem_page.verify_mathjax_rendered_in_preview()
         problem_page.click_submit()
-        self.assertTrue(problem_page.simpleprob_is_correct())
-        self.assertFalse(problem_page.is_reset_button_present())
+        self.assertEqual(problem_page.get_simpleprob_correctness(), correctness)
+        self.assertIn(score_before_reset, problem_page.problem_progress_graded_value)
+        self.assertTrue(problem_page.is_reset_button_present())
+        problem_page.click_reset()
+        self.assertIn(score_after_reset, problem_page.problem_progress_graded_value)
 
-    def test_reset_problem_after_changing_correctness(self):
+    @ddt.data(
+        ('R_1*R_2', False, 'R_1*R_2/R_3'),
+        ('R_1*R_2/R_3', True, 'R_1/R_3')
+    )
+    @ddt.unpack
+    def test_reset_correctness_after_changing_answer(self, input_value, correctness, next_input):
         """
-        Test reset possible after changing correctness to incorrectness
+        Test correctness can be reset by only changing input,and not resubmitting, after initial submission.
         """
-
         self.courseware_page.visit()
         problem_page = ProblemPage(self.browser)
-        problem_page.fill_answer_numerical('R_1*R_2/R_3')
+        problem_page.fill_answer_numerical(input_value)
         problem_page.verify_mathjax_rendered_in_preview()
         problem_page.click_submit()
-        self.assertTrue(problem_page.simpleprob_is_correct())
-        self.assertFalse(problem_page.is_reset_button_present())
-        problem_page.fill_answer_numerical('R_1/R_3')
-        problem_page.click_submit()
-        self.assertFalse(problem_page.simpleprob_is_correct())
+        self.assertEqual(problem_page.get_simpleprob_correctness(), correctness)
+        problem_page.fill_answer_numerical(next_input)
+        self.assertIsNone(problem_page.get_simpleprob_correctness())
+        self.assertTrue(problem_page.is_reset_button_present())
         problem_page.click_reset()
         self.assertEqual(problem_page.get_numerical_input_value, '')
