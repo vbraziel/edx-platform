@@ -936,6 +936,9 @@ class ProblemMetaUngradedTest(ProblemsTest):
 
 
 class FormulaProblemTest(ProblemsTest):
+    """
+    Test Class to verify the formula problem on LMS
+    """
 
     def get_problem(self):
         """
@@ -955,6 +958,9 @@ class FormulaProblemTest(ProblemsTest):
         return XBlockFixtureDesc('problem', 'TEST PROBLEM', data=xml, metadata={'show_reset_button': True})
 
     def test_reset_problem_after_incorrect_submission(self):
+        """
+        Test reset button works after incorrect submission
+        """
 
         self.courseware_page.visit()
         problem_page = ProblemPage(self.browser)
@@ -966,6 +972,9 @@ class FormulaProblemTest(ProblemsTest):
         self.assertEqual(problem_page.get_numerical_input_value, '')
 
     def test_reset_button_not_rendered_after_correct_submission(self):
+        """
+        Test reset button is not rendered after the correct submission
+        """
 
         self.courseware_page.visit()
         problem_page = ProblemPage(self.browser)
@@ -976,6 +985,9 @@ class FormulaProblemTest(ProblemsTest):
         self.assertFalse(problem_page.is_reset_button_present())
 
     def test_reset_problem_after_changing_correctness(self):
+        """
+        Test reset possible after changing correctness to incorrectness
+        """
 
         self.courseware_page.visit()
         problem_page = ProblemPage(self.browser)

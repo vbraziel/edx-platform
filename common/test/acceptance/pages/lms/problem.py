@@ -91,6 +91,10 @@ class ProblemPage(PageObject):
         )
 
     def verify_mathjax_rendered_in_preview(self):
+        """
+        Check that MathJax has been rendered in formula problem preview
+        :return:
+        """
 
         def mathjax_present():
             """ Returns True if MathJax css is present inside the preview """

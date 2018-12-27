@@ -961,6 +961,8 @@ class DiscussionEditorPreviewTest(UniqueCourseTest):
         self.page = DiscussionTabHomePage(self.browser, self.course_id)
         self.page.visit()
         self.page.click_new_post_button()
+
+        # sleep/wait added to allow Major MathJax a11y files to load
         time.sleep(5)
 
     def test_text_rendering(self):
