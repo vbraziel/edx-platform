@@ -944,7 +944,7 @@ class FormulaProblemTest(ProblemsTest):
 
     def get_problem(self):
         """
-        rerandomize: always and show_reset_button: True will show reset button, regardless the submission.
+        creating the formula response problem
         """
         xml = dedent("""
                     <problem>
@@ -957,7 +957,11 @@ class FormulaProblemTest(ProblemsTest):
     </formularesponse>
                     </problem>
                 """)
-        return XBlockFixtureDesc('problem', 'TEST PROBLEM', data=xml, metadata={'show_reset_button': True, 'rerandomize': 'always'})
+
+        # rerandomize:always will show reset button, no matter the submission correctness
+        return XBlockFixtureDesc(
+            'problem', 'TEST PROBLEM', data=xml, metadata={'show_reset_button': True, 'rerandomize': 'always'}
+        )
 
     @ddt.data(
         ('R_1*R_2', False),
