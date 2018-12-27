@@ -5,7 +5,6 @@ Tests courseware views.py
 import itertools
 import json
 import unittest
-import textwrap
 from datetime import datetime, timedelta
 from HTMLParser import HTMLParser
 from urllib import quote, urlencode
@@ -2779,7 +2778,7 @@ class TestIndexViewWithCourseDurationLimits(ModuleStoreTestCase):
         # work. Instead we remove all whitespace to verify content is correct.
         bannerText_no_spaces = escape(bannerText).replace(' ', '')
         response_no_spaces = response.content.decode('utf-8').replace(' ', '')
-        self.assertTrue(bannerText_no_spaces in response_no_spaces)
+        self.assertIn(bannerText_no_spaces, response_no_spaces)
 
     def test_index_without_course_duration_limits(self):
         """

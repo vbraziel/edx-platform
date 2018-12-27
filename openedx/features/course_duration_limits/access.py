@@ -195,6 +195,11 @@ def course_expiration_wrapper(user, block, view, frag, context):  # pylint: disa
     course = CourseOverview.get_from_id(block.course_id)
     course_expiration_fragment = generate_course_expired_fragment(user, course)
 
+    # Course content must be escaped to render correctly due to the way the
+    # way the XBlock rendering works. Transforming the safe markup to unicode
+    # escapes correctly.
+    course_expiration_fragment.content = unicode(course_expiration_fragment.content)
+
     if not course_expiration_fragment:
         return frag
 
