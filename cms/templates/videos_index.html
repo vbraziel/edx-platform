@@ -73,6 +73,32 @@
     <section class="content">
         <article class="content-primary" role="main" data-previous-uploads="${json.dumps(previous_uploads, cls=DjangoJSONEncoder)}"></article>
     </section>
+
+    <span style="position: relative;
+    top: 15px;
+    width: 100%;
+    border: 0;
+    box-shadow: 0;
+    text-align: center;
+    display: inline-block;" >
+   
+        <a href="${page_url}?page=${page-1}"
+           class="sequence-nav-button button-previous">
+          <span class="icon fa fa-chevron-left" aria-hidden="true"></span><span class="sr">${_('previous page')}</span>
+        </a>
+  
+      ${_('Page')} ${page}
+  
+      
+        <a href="${page_url}?page=${page+1}"
+           class="sequence-nav-button button-next">
+          <span class="icon fa fa-chevron-right" aria-hidden="true"></span><span class="sr">${_('next page')}</span>
+        </a>
+  </span>
 </div>
 
+
+
 </%block>
+
+  

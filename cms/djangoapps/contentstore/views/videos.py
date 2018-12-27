@@ -176,8 +176,9 @@ def videos_handler(request, course_key_string, edx_video_id=None):
     if request.method == "GET":
         if "application/json" in request.META.get("HTTP_ACCEPT", ""):
             return videos_index_json(course)
-        else:
-            return videos_index_html(course)
+        page = request.GET.get('page', 0) or True
+        # True is waffle config, if page number is not specified 
+        return videos_index_html(course, int(page))
     elif request.method == "DELETE":
         remove_video_for_course(course_key_string, edx_video_id)
         return JsonResponse()
@@ -479,11 +480,17 @@ def convert_video_status(video, is_video_encodes_ready=False):
     return status
 
 
-def _get_videos(course):
+def _get_videos(course, page=0):
     """
     Retrieves the list of videos from VAL corresponding to this course.
     """
-    videos = list(get_videos_for_course(unicode(course.id), VideoSortField.created, SortDirection.desc))
+    videos = list(get_videos_for_course(
+        unicode(course.id),
+        VideoSortField.created,
+        SortDirection.desc,
+        page,
+        )
+    )
 
     # This is required to see if edx video pipeline is enabled while converting the video status.
     course_video_upload_token = course.video_upload_pipeline.get('course_video_upload_token')
@@ -516,7 +523,7 @@ def _get_default_video_image_url():
     return staticfiles_storage.url(settings.VIDEO_IMAGE_DEFAULT_FILENAME)
 
 
-def _get_index_videos(course):
+def _get_index_videos(course, page=0):
     """
     Returns the information about each video upload required for the video list
     """
@@ -541,7 +548,7 @@ def _get_index_videos(course):
         return values
 
     return [
-        _get_values(video) for video in _get_videos(course)
+        _get_values(video) for video in _get_videos(course, page)
     ]
 
 
@@ -570,10 +577,11 @@ def get_all_transcript_languages():
     return all_languages
 
 
-def videos_index_html(course):
+def videos_index_html(course, page=0):
     """
     Returns an HTML page to display previous video uploads and allow new ones
     """
+    
     is_video_transcript_enabled = VideoTranscriptEnabledFlag.feature_enabled(course.id)
     context = {
         'context_course': course,
@@ -581,7 +589,7 @@ def videos_index_html(course):
         'video_handler_url': reverse_course_url('videos_handler', unicode(course.id)),
         'encodings_download_url': reverse_course_url('video_encodings_download', unicode(course.id)),
         'default_video_image_url': _get_default_video_image_url(),
-        'previous_uploads': _get_index_videos(course),
+        'previous_uploads': _get_index_videos(course, page),
         'concurrent_upload_limit': settings.VIDEO_UPLOAD_PIPELINE.get('CONCURRENT_UPLOAD_LIMIT', 0),
         'video_supported_file_formats': VIDEO_SUPPORTED_FILE_FORMATS.keys(),
         'video_upload_max_file_size': VIDEO_UPLOAD_MAX_FILE_SIZE_GB,
@@ -602,7 +610,9 @@ def videos_index_html(course):
             'transcript_upload_handler_url': reverse('transcript_upload_handler'),
             'transcript_delete_handler_url': reverse_course_url('transcript_delete_handler', unicode(course.id)),
             'trancript_download_file_format': Transcript.SRT
-        }
+        },
+        'page': page,
+        'page_url': reverse('videos_handler', kwargs={'course_key_string': unicode(course.id)}),
     }
 
     if is_video_transcript_enabled:
