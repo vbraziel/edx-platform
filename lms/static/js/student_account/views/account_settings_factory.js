@@ -28,7 +28,9 @@
             edxSupportUrl,
             extendedProfileFields,
             displayAccountDeletion,
-            isSecondaryEmailFeatureEnabled
+            isSecondaryEmailFeatureEnabled,
+            isBetaLanguage,
+            betaLanguage
         ) {
             var $accountSettingsElement, userAccountModel, userPreferencesModel, aboutSectionsData,
                 accountsSectionData, ordersSectionData, accountSettingsView, showAccountSettingsPage,
@@ -178,7 +180,6 @@
                                     {platform_name: platformName}
                                 ),
                                 options: fieldsData.language.options,
-                                betaLangOptions: fieldsData.beta_language.options,
                                 persistChanges: true,
                                 focusNextID: '#u-field-select-country'
                             })
@@ -409,7 +410,10 @@
                     accountsTabSections: accountsSectionData,
                     ordersTabSections: ordersSectionData
                 },
-                userPreferencesModel: userPreferencesModel
+                userPreferencesModel: userPreferencesModel,
+                isBetaLanguage: isBetaLanguage,
+                betaLanguage: betaLanguage,
+                platformName: platformName
             });
 
             accountSettingsView.render();

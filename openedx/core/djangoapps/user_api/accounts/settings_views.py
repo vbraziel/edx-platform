@@ -19,6 +19,7 @@ from openedx.core.djangoapps.dark_lang.models import DarkLangConfig
 from openedx.core.djangoapps.lang_pref.api import all_languages, released_languages
 from openedx.core.djangoapps.programs.models import ProgramsApiConfig
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
+from openedx.core.djangoapps.user_api.preferences.api import get_user_preferences
 from openedx.core.lib.edx_api_utils import get_edx_api_data
 from openedx.core.lib.time_zone_utils import TIME_ZONE_CHOICES
 from openedx.features.enterprise_support.api import get_enterprise_customer_for_learner
@@ -75,7 +76,16 @@ def account_settings_context(request):
         # it will be broken if exception raised
         user_orders = []
 
+    is_beta_language = False
+    user_language = {}
     dark_lang_config = DarkLangConfig.current()
+    if dark_lang_config.enable_beta_languages:
+        user_preferences = get_user_preferences(user)
+        pref_language = user_preferences.get('pref-lang')
+        if pref_language in dark_lang_config.beta_languages_list:
+            is_beta_language = True
+            user_language['code'] = pref_language
+            user_language['name'] = settings.LANGUAGE_DICT.get(pref_language)
 
     context = {
         'auth': {},
@@ -88,8 +98,6 @@ def account_settings_context(request):
                 'options': [(choice[0], _(choice[1])) for choice in UserProfile.GENDER_CHOICES],
             }, 'language': {
                 'options': released_languages(),
-            }, 'beta_language': {
-                'options': dark_lang_config.beta_languages_list if dark_lang_config.enable_beta_languages else [],
             }, 'level_of_education': {
                 'options': [(choice[0], _(choice[1])) for choice in UserProfile.LEVEL_OF_EDUCATION_CHOICES],
             }, 'password': {
@@ -116,6 +124,8 @@ def account_settings_context(request):
             'ENABLE_ACCOUNT_DELETION', settings.FEATURES.get('ENABLE_ACCOUNT_DELETION', False)
         ),
         'extended_profile_fields': _get_extended_profile_fields(),
+        'is_beta_language': is_beta_language,
+        'beta_language': user_language
     }
 
     enterprise_customer = get_enterprise_customer_for_learner(site=request.site, user=request.user)

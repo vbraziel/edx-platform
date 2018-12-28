@@ -410,6 +410,7 @@
                 this._super(options);
 
                 this.listenTo(this.model, 'change:' + this.options.valueAttribute, this.updateValueInField);
+                this.listenTo(this.model, 'revertValue', this.revertValue);
             },
 
             render: function() {
@@ -495,7 +496,20 @@
             saveValue: function() {
                 var attributes = {};
                 attributes[this.options.valueAttribute] = this.fieldValue();
+                $.cookie('old-pref-lang', this.modelValue());
                 this.saveAttributes(attributes);
+            },
+
+            revertValue: function() {
+                var attributes = {},
+                    oldPrefLang = $.cookie('old-pref-lang');
+
+                if (oldPrefLang) {
+                    // Deleting the cookie
+                    document.cookie = "old-pref-lang=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/account;";
+                    attributes['pref-lang'] = oldPrefLang;
+                    this.saveAttributes(attributes);
+                }
             },
 
             showDisplayMode: function(render) {
