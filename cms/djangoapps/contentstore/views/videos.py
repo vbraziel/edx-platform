@@ -43,7 +43,7 @@ from contentstore.video_utils import validate_video_image
 from edxmako.shortcuts import render_to_response
 from openedx.core.djangoapps.video_config.models import VideoTranscriptEnabledFlag
 from openedx.core.djangoapps.video_pipeline.config.waffle import waffle_flags, DEPRECATE_YOUTUBE
-from openedx.core.djangoapps.waffle_utils import WaffleSwitchNamespace
+from openedx.core.djangoapps.waffle_utils import CourseWaffleFlag, WaffleSwitchNamespace, WaffleFlagNamespace
 from util.json_request import JsonResponse, expect_json
 
 from .course import get_course_and_check_access
@@ -64,6 +64,14 @@ WAFFLE_SWITCHES = WaffleSwitchNamespace(name=WAFFLE_NAMESPACE)
 # Waffle switch for enabling/disabling video image upload feature
 VIDEO_IMAGE_UPLOAD_ENABLED = 'video_image_upload_enabled'
 
+# Waffle flag namespace for studio
+WAFFLE_STUDIO_FLAG_NAMESPACE = WaffleFlagNamespace(name=u'studio')
+
+ENABLE_VIDEO_UPLOAD_PAGINATION = CourseWaffleFlag(
+    waffle_namespace=WAFFLE_STUDIO_FLAG_NAMESPACE,
+    flag_name=u'enable_video_upload_pagination',
+    flag_undefined_default=False
+)
 # Default expiration, in seconds, of one-time URLs used for uploading videos.
 KEY_EXPIRATION_IN_SECONDS = 86400
 
@@ -176,7 +184,8 @@ def videos_handler(request, course_key_string, edx_video_id=None):
     if request.method == "GET":
         if "application/json" in request.META.get("HTTP_ACCEPT", ""):
             return videos_index_json(course)
-        page = request.GET.get('page', 0) or True
+        course_key = CourseKey.from_string(course_key_string)
+        page = request.GET.get('page', 0) or ENABLE_VIDEO_UPLOAD_PAGINATION.is_enabled(course_key)
         # True is waffle config, if page number is not specified 
         return videos_index_html(course, int(page))
     elif request.method == "DELETE":
@@ -484,13 +493,13 @@ def _get_videos(course, page=0):
     """
     Retrieves the list of videos from VAL corresponding to this course.
     """
-    videos = list(get_videos_for_course(
+    videos , paginator_context = get_videos_for_course(
         unicode(course.id),
         VideoSortField.created,
         SortDirection.desc,
         page,
         )
-    )
+    videos = list(videos)
 
     # This is required to see if edx video pipeline is enabled while converting the video status.
     course_video_upload_token = course.video_upload_pipeline.get('course_video_upload_token')
@@ -513,7 +522,7 @@ def _get_videos(course, page=0):
         # Convert the video status.
         video['status'] = convert_video_status(video, is_video_encodes_ready)
 
-    return videos
+    return videos , paginator_context
 
 
 def _get_default_video_image_url():
@@ -546,10 +555,10 @@ def _get_index_videos(course, page=0):
                 values[attr] = video[attr]
 
         return values
-
+    videos , paginator_context = _get_videos(course, page)
     return [
-        _get_values(video) for video in _get_videos(course, page)
-    ]
+        _get_values(video) for video in videos
+    ] , paginator_context
 
 
 def get_all_transcript_languages():
@@ -583,13 +592,14 @@ def videos_index_html(course, page=0):
     """
     
     is_video_transcript_enabled = VideoTranscriptEnabledFlag.feature_enabled(course.id)
+    previous_uploads , paginator_context = _get_index_videos(course, page)
     context = {
         'context_course': course,
         'image_upload_url': reverse_course_url('video_images_handler', unicode(course.id)),
         'video_handler_url': reverse_course_url('videos_handler', unicode(course.id)),
         'encodings_download_url': reverse_course_url('video_encodings_download', unicode(course.id)),
         'default_video_image_url': _get_default_video_image_url(),
-        'previous_uploads': _get_index_videos(course, page),
+        'previous_uploads': previous_uploads,
         'concurrent_upload_limit': settings.VIDEO_UPLOAD_PIPELINE.get('CONCURRENT_UPLOAD_LIMIT', 0),
         'video_supported_file_formats': VIDEO_SUPPORTED_FILE_FORMATS.keys(),
         'video_upload_max_file_size': VIDEO_UPLOAD_MAX_FILE_SIZE_GB,
@@ -613,6 +623,7 @@ def videos_index_html(course, page=0):
         },
         'page': page,
         'page_url': reverse('videos_handler', kwargs={'course_key_string': unicode(course.id)}),
+        'paginator_context' : paginator_context
     }
 
     if is_video_transcript_enabled:
