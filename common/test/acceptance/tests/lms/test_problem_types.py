@@ -7,6 +7,7 @@ import random
 import textwrap
 from abc import ABCMeta, abstractmethod
 
+from unittest import skip
 import ddt
 import pytest
 from selenium.webdriver import ActionChains
@@ -91,6 +92,7 @@ class ProblemTypeTestBase(ProblemsTest, EventsTestMixin):
         'incorrect': ['span.incorrect'],
         'unanswered': ['span.unanswered'],
         'submitted': ['span.submitted'],
+        'unsubmitted': ['.unsubmitted']
     }
 
     def setUp(self):
@@ -127,6 +129,18 @@ class ProblemTypeTestBase(ProblemsTest, EventsTestMixin):
         msg = "Wait for status to be {}".format(status)
         selector = ', '.join(self.status_indicators[status])
         self.problem_page.wait_for_element_visibility(selector, msg)
+
+    def is_status_true(self, status):
+        """
+        Returns the status of problem
+        Args:
+            status(string): status of the problem which is to be checked
+
+        Returns:
+            True: If provided status is present on the page
+        """
+        selector = ', '.join(self.status_indicators[status])
+        return self.problem_page.is_present(selector)
 
     @abstractmethod
     def answer_problem(self, correctness):
@@ -566,7 +580,7 @@ class CheckboxProblemTypeBase(ProblemTypeTestBase):
             self.problem_page.click_choice("choice_1")
             self.problem_page.click_choice("choice_3")
 
-
+@ddt.ddt
 class CheckboxProblemTypeTest(CheckboxProblemTypeBase, ProblemTypeTestMixin):
     """
     Standard tests for the Checkbox Problem Type
@@ -586,6 +600,131 @@ class CheckboxProblemTypeTest(CheckboxProblemTypeBase, ProblemTypeTestMixin):
         self.assertTrue(self.problem_page.is_correct_choice_highlighted(correct_choices=[1, 3]))
         self.problem_page.wait_for_show_answer_notification()
 
+    @ddt.data('correct', 'incorrect')
+    def test_reset_checkbox_problem(self, correctness):
+        """
+        Scenario: I can reset a problem
+
+        Given I am viewing a checkbox problem with randomization: always and with reset button: on
+        And I answer a checkbox problem correct/incorrect
+        When I reset the problem
+        Then my checkbox answer is marked "unanswered"
+        And The checkbox problem displays a "blank" answer
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+    @ddt.data(['correct', '1/1 point (ungraded)'], ['incorrect', '0/1 point (ungraded)'])
+    @ddt.unpack
+    def test_checkbox_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a checkbox problem when I answer it and after I reset it
+
+        Given I am viewing a checkbox problem
+        When I answer a checkbox problem correct/incorrect
+        Then I should see a score
+        When I reset the problem
+        Then I should see a score of points possible: 1/1 point (ungraded) -- 0/1 point (ungraded)
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/1 point (ungraded)')
+
+    @ddt.data(['correct', 'incorrect'], ['incorrect', 'correct'])
+    @ddt.unpack
+    def test_reset_correctness_after_changing_answer(self, initial_correctness, other_correctness):
+        """
+        Scenario: I can reset the correctness of a problem after changing my answer
+
+            Given I am viewing a checkbox problem
+            Then my checkbox's answer is marked "unanswered"
+            When I answer a checkbox problem inital correctness
+            And I input an answer on a checkbox problem other correctness
+            Then my checkbox problem answer is marked "unanswered"
+            And I reset the problem
+        """
+        self.wait_for_status("unanswered")
+        self.assertTrue(self.is_status_true("unanswered"))
+        self.answer_problem(initial_correctness)
+        self.problem_page.click_submit()
+
+        self.wait_for_status(initial_correctness)
+        self.assertTrue(self.is_status_true(initial_correctness))
+
+        self.answer_problem(other_correctness)
+        self.wait_for_status("unanswered")
+        self.assertTrue(self.is_status_true("unanswered"))
+        self.problem_page.click_reset()
+
+
+class CheckboxProblemTypeTestNonRandomized(CheckboxProblemTypeBase, ProblemTypeTestMixin):
+    """
+    Standard tests for the Multiple Radio Problem Type
+    """
+
+    def get_problem(self):
+        """
+        Creates a {problem_type} problem
+        """
+        # Generate the problem XML using capa.tests.response_xml_factory
+        return XBlockFixtureDesc(
+            'problem',
+            self.problem_name,
+            data=self.factory.build_xml(**self.factory_kwargs),
+            metadata={'rerandomize': 'never', 'show_reset_button': True}
+        )
+
+    def test_reset_non_randomized_checkbox_problem_incorrectly(self):
+        """
+        Scenario: I can reset a non-randomized checkbox problem that I answered incorrectly
+
+        Given I am viewing a checkbox problem with randomization: never and with reset button: on
+        And I answer a checkbox problem incorrectly
+        When I reset the problem
+        Then my a checkbox problem answer is marked "unanswered"
+        And The a checkbox problem problem displays a "blank" answer
+        """
+        self.answer_problem("incorrect")
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+    def test_non_randomized_checkbox_problem_correctly(self):
+        """
+        Scenario: The reset button doesn't show up
+
+        Given I am viewing a checkbox problem with randomization: never and with reset button: on
+        And I answer a checkbox problem problem correctly
+        Then The "Reset" button does not appear
+        """
+        self.answer_problem("correct")
+        self.problem_page.click_submit()
+        self.assertFalse(self.problem_page.is_reset_button_present())
+
+    @skip('Can not be implemented because')
+    @ddt.data(['correct', '1/1 point (ungraded)'], ['incorrect', '0/1 point (ungraded)'])
+    @ddt.unpack
+    def test_checkbox_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a checkbox problem when I answer it and after I reset it
+
+        Given I am viewing checkbox problem with randomization: never and with reset button: on
+        When I answer a checkbox problem correct/incorrect
+        Then I should see a score
+        When I reset the problem
+        Then I should see a score of possible points
+        """
+        self.answer_problem(correctness)
+        self.assertEqual(self.problem_page.problem_progress_graded_value, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/1 point (ungraded)')
+
 
 class CheckboxProblemTypeNeverShowCorrectnessTest(CheckboxProblemTypeBase, ProblemNeverShowCorrectnessMixin):
     """
@@ -594,6 +733,7 @@ class CheckboxProblemTypeNeverShowCorrectnessTest(CheckboxProblemTypeBase, Probl
     pass
 
 
+@ddt.ddt
 class MultipleChoiceProblemTypeBase(ProblemTypeTestBase):
     """
     ProblemTypeTestBase specialization Multiple Choice Problem Type
@@ -617,6 +757,18 @@ class MultipleChoiceProblemTypeBase(ProblemTypeTestBase):
         'submitted': ['label.choicegroup_submitted', 'span.submitted'],
     }
 
+    def is_status_true(self, status):
+        """
+        Returns the status of problem
+        Args:
+            status(string): status of the problem which is to be checked
+
+        Returns:
+            True: If provided status is present on the page
+        """
+        selector = ', '.join(self.status_indicators[status])
+        return self.problem_page.is_present(selector)
+
     def answer_problem(self, correctness):
         """
         Answer multiple choice problem.
@@ -627,6 +779,7 @@ class MultipleChoiceProblemTypeBase(ProblemTypeTestBase):
             self.problem_page.click_choice("choice_choice_2")
 
 
+@ddt.ddt
 class MultipleChoiceProblemTypeTest(MultipleChoiceProblemTypeBase, ProblemTypeTestMixin):
     """
     Standard tests for the Multiple Choice Problem Type
@@ -658,6 +811,247 @@ class MultipleChoiceProblemTypeTest(MultipleChoiceProblemTypeBase, ProblemTypeTe
 
         # Finally, make sure that clicking Show Answer moved focus to the correct place.
         self.problem_page.wait_for_show_answer_notification()
+
+    @ddt.data('correct', 'incorrect')
+    def test_reset_multiple_choice_problem(self, correctness):
+        """
+        Scenario: I can reset a problem
+
+        Given I am viewing a multiple choice problem with randomization: always and with reset button on
+        And I answer a multiple choice problem correct/incorrect
+        When I reset the problem
+        Then my multiple choice answer is marked "unanswered"
+        And The multiple choice displays a "blank" answer
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+    @ddt.data(['correct', '1/1 point (ungraded)'], ['incorrect', '0/1 point (ungraded)'])
+    @ddt.unpack
+    def test_mcq_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a multiple choice problem when I answer it and after I reset it
+
+        Given I am viewing a multiple choice problem
+        When I answer a multiple choice problem correct/incorrect
+        Then I should see a score
+        When I reset the problem
+        Then I should see a score of points possible: (1/1 point (ungraded) -- 0/1 point (ungraded)
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/1 point (ungraded)')
+
+    @ddt.data(['correct', 'incorrect'], ['incorrect', 'correct'])
+    @ddt.unpack
+    def test_reset_correctness_after_changing_answer(self, initial_correctness, other_correctness):
+        """
+        Scenario: I can reset the correctness of a multiple choice problem after changing my answer
+
+        Given I am viewing a multiple choice problem
+        When I answer a multiple choice problem InitialCorrectness
+        Then my multiple choice answer is marked InitialCorrectness
+        And I reset the problem
+        Then my multiple choice answer is NOT marked InitialCorrectness
+        And my multiple choice answer is NOT marked OtherCorrectness
+        """
+        self.wait_for_status("unanswered")
+        self.assertTrue(self.is_status_true("unanswered"))
+        self.answer_problem(initial_correctness)
+        self.problem_page.click_submit()
+
+        self.wait_for_status(initial_correctness)
+        self.assertTrue(self.is_status_true(initial_correctness))
+        self.problem_page.click_reset()
+
+        self.assertFalse(self.is_status_true(initial_correctness))
+        self.assertFalse(self.is_status_true(other_correctness))
+
+
+@ddt.ddt
+class MultipleChoiceProblemTypeTestNonRandomized(MultipleChoiceProblemTypeBase, ProblemTypeTestMixin):
+
+    def get_problem(self):
+        """
+        Creates a {problem_type} problem
+        """
+        # Generate the problem XML using capa.tests.response_xml_factory
+        return XBlockFixtureDesc(
+            'problem',
+            self.problem_name,
+            data=self.factory.build_xml(**self.factory_kwargs),
+            metadata={'rerandomize': 'never', 'show_reset_button': True, 'max_attempts': 1}
+        )
+
+    def test_non_randomized_multiple_choice_problem_incorrectly(self):
+        """
+        Scenario: I can reset a non-randomized multiple choice problem that I answered incorrectly
+
+        Given I am viewing a multiple choice problem with randomization: never and with reset button: on
+        And I answer a multiple choice problem incorrectly
+        When I reset the problem
+        Then my a multiple choice problem answer is marked "unanswered"
+        And The a multiple choice problem problem displays a "blank" answer
+        """
+        self.answer_problem("incorrect")
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.is_status_true('unanswered')
+
+    def test_non_randomized_multiple_choice_problem_correctly(self):
+        """
+        Scenario: The reset button doesn't show up
+
+        Given I am viewing a multiple_choice problem with randomization: never and with reset button: on
+        And I answer a multiple_choice problem problem correctly
+        Then The "Reset" button does not appear
+        """
+        self.answer_problem("correct")
+        self.problem_page.click_submit()
+        self.assertFalse(self.problem_page.is_reset_button_present())
+
+    def test_non_randomized_multiple_choice_with_multiple_attempts(self):
+        """
+        Scenario: I can answer a problem with multiple attempts correctly and still reset the problem
+
+        Given I am viewing a "multiple choice" problem with "3" attempts
+        Then I should see "You have used 0 of 3 attempts" somewhere in the page
+        When I answer a "multiple choice" problem "correctly"
+        Then The "Reset" button does appear
+
+        """
+        self.assertEqual(
+            self.problem_page.submission_feedback,
+            "You have used 0 of 3 attempts",
+            "All 3 attempts are not available"
+        )
+
+        self.answer_problem("correct")
+        self.problem_page.click_submit()
+        self.assertFalse(self.problem_page.is_reset_button_present())
+
+    @skip('This can not be implemented')
+    # With randomization as never, there is no way learner can reset the problem
+    # after answering the problem correctly. The test is not implemented correctly
+    # in lettuce either. In lettuce, the first step calls the wrong method, which
+    # just creates a problem without changing the randomization setting.
+    @ddt.data(['correct', '1/1 point (ungraded)'], ['incorrect', '0/1 point (ungraded)'])
+    @ddt.unpack
+    def test_mcq_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a multiple choice problem when I answer it and after I reset it
+
+        Given I am viewing multiple choice problem with randomization: never and with reset button: on
+        When I answer a multiple choice problem correct/incorrect
+        Then I should see a score
+        When I reset the problem
+        Then I should see a score of possible points
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/1 point (ungraded)')
+
+
+class MultipleChoiceProblemTypeTestOneAttempt(MultipleChoiceProblemTypeBase, ProblemTypeTestMixin):
+
+    def get_problem(self):
+        """
+        Creates a {problem_type} problem
+        """
+        # Generate the problem XML using capa.tests.response_xml_factory
+        return XBlockFixtureDesc(
+            'problem',
+            self.problem_name,
+            data=self.factory.build_xml(**self.factory_kwargs),
+            metadata={'rerandomize': 'never', 'show_reset_button': True, 'max_attempts': 1}
+        )
+
+    def test_answer_with_one_attempt_correctly(self):
+        """
+        Scenario: I can answer a problem with one attempt correctly and not reset
+
+        Given I am viewing a "multiple choice" problem with "1" attempt
+        When I answer a "multiple choice" problem "correctly"
+        Then The "Reset" button does not appear
+        """
+        self.answer_problem("correct")
+        self.problem_page.click_submit()
+        self.assertFalse(self.problem_page.is_reset_button_present())
+
+
+class MultipleChoiceProblemTypeTestMultipleAttempt(MultipleChoiceProblemTypeBase, ProblemTypeTestMixin):
+
+    def get_problem(self):
+        """
+        Creates a {problem_type} problem
+        """
+        # Generate the problem XML using capa.tests.response_xml_factory
+        return XBlockFixtureDesc(
+            'problem',
+            self.problem_name,
+            data=self.factory.build_xml(**self.factory_kwargs),
+            metadata={'rerandomize': 'always', 'show_reset_button': True, 'max_attempts': 3}
+        )
+
+    def test_answer_with_multiple_attempt_correctly(self):
+        """
+        Scenario: I can view how many attempts I have left on a problem
+
+        Given I am viewing a "multiple choice" problem with "3" attempts
+        Then I should see "You have used 0 of 3 attempts" somewhere in the page
+        When I answer a "multiple choice" problem "incorrectly"
+        And I reset the problem
+        Then I should see "You have used 1 of 3 attempts" somewhere in the page
+        When I answer a "multiple choice" problem "incorrectly"
+        And I reset the problem
+        Then I should see "You have used 2 of 3 attempts" somewhere in the page
+        And The "Submit" button does appear
+        When I answer a "multiple choice" problem "correctly"
+        Then The "Reset" button does not appear
+        """
+        self.assertEqual(
+            self.problem_page.submission_feedback,
+            "You have used 0 of 3 attempts",
+            "All 3 attempts are not available"
+        )
+        self.answer_problem("correct")
+        self.problem_page.click_submit()
+        self.assertTrue(self.problem_page.is_reset_button_present())
+
+    def test_learner_can_see_attempts_left(self):
+        self.assertEqual(
+            self.problem_page.submission_feedback,
+            "You have used 0 of 3 attempts",
+            "All 3 attempts are not available"
+        )
+        self.answer_problem("incorrect")
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.assertEqual(
+            self.problem_page.submission_feedback,
+            "You have used 1 of 3 attempts",
+            "All 3 attempts are not available"
+        )
+        self.answer_problem("incorrect")
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.assertEqual(
+            self.problem_page.submission_feedback,
+            "You have used 2 of 3 attempts",
+            "All 3 attempts are not available"
+        )
+        self.assertTrue(self.problem_page.is_submit_disabled())
+        self.answer_problem("correct")
+        self.problem_page.click_submit()
+        self.assertFalse(self.problem_page.is_reset_button_present())
 
 
 class MultipleChoiceProblemTypeNeverShowCorrectnessTest(MultipleChoiceProblemTypeBase,
@@ -701,12 +1095,134 @@ class RadioProblemTypeBase(ProblemTypeTestBase):
         else:
             self.problem_page.click_choice("choice_1")
 
+    def is_status_true(self, status):
+        """
+        Returns the status of problem
+        Args:
+            status(string): status of the problem which is to be checked
 
+        Returns:
+            True: If provided status is present on the page
+        """
+        selector = ', '.join(self.status_indicators[status])
+        return self.problem_page.is_present(selector)
+
+
+@ddt.ddt
 class RadioProblemTypeTest(RadioProblemTypeBase, ProblemTypeTestMixin):
     """
     Standard tests for the Multiple Radio Problem Type
     """
-    pass
+
+    @ddt.data('correct', 'incorrect')
+    def test_reset_radio_button_problem(self, correctness):
+        """
+        Scenario: I can reset a problem
+
+        Given I am viewing a radio button problem with randomization: always and with reset button on
+        And I answer a radio button problem correct/incorrect
+        When I reset the problem
+        Then my radio button problem answer is marked "unanswered"
+        And The radio button problem displays a "blank" answer
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+    @ddt.data(['correct', '1/1 point (ungraded)'], ['incorrect', '0/1 point (ungraded)'])
+    @ddt.unpack
+    def test_radio_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a radio problem when I answer it and after I reset it
+
+        Given I am viewing a radio problem
+        When I answer a radio problem correct/incorrect
+        Then I should see a score
+        When I reset the problem
+        Then I should see a score of points possible: 1/1 point (ungraded) -- 0/1 point (ungraded)
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/1 point (ungraded)')
+
+    @ddt.data(['correct', 'incorrect'], ['incorrect', 'correct'])
+    @ddt.unpack
+    def test_reset_correctness_after_changing_answer(self, initial_correctness, other_correctness):
+        """
+        Scenario: I can reset the correctness of a multiple choice problem after changing my answer
+
+        Given I am viewing a multiple choice problem
+        When I answer a multiple choice problem InitialCorrectness
+        Then my multiple choice answer is marked InitialCorrectness
+        And I reset the problem
+        Then my multiple choice answer is NOT marked InitialCorrectness
+        And my multiple choice answer is NOT marked OtherCorrectness
+        """
+        self.wait_for_status("unanswered")
+        self.assertTrue(self.is_status_true("unanswered"))
+        self.answer_problem(initial_correctness)
+        self.problem_page.click_submit()
+
+        self.wait_for_status(initial_correctness)
+        self.assertTrue(self.is_status_true(initial_correctness))
+        self.problem_page.click_reset()
+
+        self.assertFalse(self.is_status_true(initial_correctness))
+        self.assertFalse(self.is_status_true(other_correctness))
+
+
+class RadioProblemTypeTestNonRandomized(RadioProblemTypeBase, ProblemTypeTestMixin):
+
+    def get_problem(self):
+        """
+        Creates a {problem_type} problem
+        """
+        # Generate the problem XML using capa.tests.response_xml_factory
+        return XBlockFixtureDesc(
+            'problem',
+            self.problem_name,
+            data=self.factory.build_xml(**self.factory_kwargs),
+            metadata={'rerandomize': 'never', 'show_reset_button': True}
+        )
+
+    def test_non_randomized_radio_problem_correctly(self):
+        """
+        Scenario: The reset button doesn't show up
+
+        Given I am viewing a radio problem with randomization: never and with reset button: on
+        And I answer a radio problem problem problem correctly
+        Then The "Reset" button does not appear
+        """
+        self.answer_problem("correct")
+        self.problem_page.click_submit()
+        self.assertFalse(self.problem_page.is_reset_button_present())
+
+    @skip('This can not be implemented')
+    # With randomization as never, there is no way learner can reset the problem
+    # after answering the problem correctly. The test is not implemented correctly
+    # in lettuce either. In lettuce, the first step calls the wrong method, which
+    # just creates a problem without changing the randomization setting.
+    @ddt.data(['correct', '1/1 point (ungraded)'], ['incorrect', '0/1 point (ungraded)'])
+    @ddt.unpack
+    def test_radio_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a radio problem when I answer it and after I reset it
+
+        Given I am viewing radio problem with randomization: never and with reset button: on
+        When I answer a radio problem correct/incorrect
+        Then I should see a score
+        When I reset the problem
+        Then I should see a score of possible points
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/1 point (ungraded)')
 
 
 class RadioProblemTypeNeverShowCorrectnessTest(RadioProblemTypeBase, ProblemNeverShowCorrectnessMixin):
@@ -743,11 +1259,142 @@ class DropDownProblemTypeBase(ProblemTypeTestBase):
         select_option_by_text(selector_element, answer)
 
 
-class DropDownProblemTypeTest(DropDownProblemTypeBase, ProblemTypeTestMixin):
+@ddt.ddt
+class DropdownProblemTypeTest(DropDownProblemTypeBase, ProblemTypeTestMixin):
+    """
+    Standard tests for the Dropdown Problem Type
+    """
+
+    @ddt.data('correct', 'incorrect')
+    def test_reset_dropdown_problem(self, correctness):
+        """
+        Scenario: I can reset a problem
+
+        Given I am viewing a numerical problem with randomization: always and with reset button: on
+        And I answer a dropdown problem correct/incorrect
+        When I reset the problem
+        Then my dropdown answer is marked "unanswered"
+        And The dropdown problem displays a "blank" answer
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+    @ddt.data(['correct', '1/1 point (ungraded)'], ['incorrect', '0/1 point (ungraded)'])
+    @ddt.unpack
+    def test_dropdown_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a radio problem when I answer it and after I reset it
+
+        Given I am viewing a dropdown problem
+        When I answer a dropdown problem correct/incorrect
+        Then I should see a score
+        When I reset the problem
+        Then I should see a score of points possible: 1/1 point (ungraded) -- 0/1 point (ungraded)
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/1 point (ungraded)')
+
+    @ddt.data(['correct', 'incorrect'], ['incorrect', 'correct'])
+    @ddt.unpack
+    def test_reset_correctness_after_changing_answer(self, initial_correctness, other_correctness):
+        """
+        Scenario: I can reset the correctness of a problem after changing my answer
+
+        Given I am viewing a dropdown problem
+        Then my dropdown problem's answer is marked "unanswered"
+        When I answer a dropdown problem inital correctness
+        And I input an answer on a dropdown problem other correctness
+        Then my dropdown problem answer is marked "unanswered"
+        And I reset the problem
+        """
+        self.wait_for_status("unanswered")
+        self.assertTrue(self.is_status_true("unanswered"))
+        self.answer_problem(initial_correctness)
+        self.problem_page.click_submit()
+
+        self.wait_for_status(initial_correctness)
+        self.assertTrue(self.is_status_true(initial_correctness))
+
+        self.answer_problem(other_correctness)
+        self.wait_for_status("unanswered")
+        self.assertTrue(self.is_status_true("unanswered"))
+        self.problem_page.click_reset()
+
+@ddt.ddt
+class DropDownProblemTypeTestNonRandomized(DropDownProblemTypeBase, ProblemTypeTestMixin):
     """
     Standard tests for the Multiple Radio Problem Type
     """
-    pass
+
+    def get_problem(self):
+        """
+        Creates a {problem_type} problem
+        """
+        # Generate the problem XML using capa.tests.response_xml_factory
+        return XBlockFixtureDesc(
+            'problem',
+            self.problem_name,
+            data=self.factory.build_xml(**self.factory_kwargs),
+            metadata={'rerandomize': 'never', 'show_reset_button': True}
+        )
+
+    def test_non_randomized_dropdown_problem_incorrectly(self):
+        """
+        Scenario: I can reset a non-randomized dropdown problem that I answered incorrectly
+
+        Given I am viewing a dropdown problem with randomization: never and with reset button: on
+        And I answer a dropdown problem incorrectly
+        When I reset the problem
+        Then my a dropdown problem answer is marked "unanswered"
+        And The a dropdown problem problem displays a "blank" answer
+        """
+        self.answer_problem("incorrect")
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+    def test_non_randomized_dropdown_problem_correctly(self):
+        """
+        Scenario: The reset button doesn't show up
+
+        Given I am viewing a dropdown problem with randomization: never and with reset button: on
+        And I answer a dropdown problem problem problem correctly
+        Then The "Reset" button does not appear
+        """
+        self.answer_problem("correct")
+        self.problem_page.click_submit()
+        self.assertFalse(self.problem_page.is_reset_button_present())
+
+    @skip('This can not be implemented')
+    # With randomization as never, there is no way learner can reset the problem
+    # after answering the problem correctly. The test is not implemented correctly
+    # in lettuce either. In lettuce, the first step calls the wrong method, which
+    # just creates a problem without changing the randomization setting.
+    @ddt.data(['correct', '1/1 point (ungraded)'], ['incorrect', '0/1 point (ungraded)'])
+    @ddt.unpack
+    def test_dropdown_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a dropdown problem when I answer it and after I reset it
+
+        Given I am viewing dropdown problem with randomization: never and with reset button: on
+        When I answer a dropdown problem correct/incorrect
+        Then I should see a score
+        When I reset the problem
+        Then I should see a score of possible points
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.score_notification, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/1 point (ungraded)')
+
 
 
 class DropDownProblemTypeNeverShowCorrectnessTest(DropDownProblemTypeBase, ProblemNeverShowCorrectnessMixin):
@@ -825,7 +1472,31 @@ class NumericalProblemTypeBase(ProblemTypeTestBase):
         'incorrect': ['div.incorrect'],
         'unanswered': ['div.unanswered', 'div.unsubmitted'],
         'submitted': ['div.submitted'],
+        'unsubmitted': ['div.unsubmitted']
     }
+
+    def wait_for_status(self, status):
+        """
+        Waits for the expected status indicator.
+
+        Args:
+            status: one of ("correct", "incorrect", "unanswered", "submitted")
+        """
+        msg = "Wait for status to be {}".format(status)
+        selector = ', '.join(self.status_indicators[status])
+        self.problem_page.wait_for_element_visibility(selector, msg)
+
+    def is_status_true(self, status):
+        """
+        Returns the status of problem
+        Args:
+            status(string): status of the problem which is to be checked
+
+        Returns:
+            True: If provided status is present on the page
+        """
+        selector = ', '.join(self.status_indicators[status])
+        return self.problem_page.is_present(selector)
 
     def answer_problem(self, correctness):
         """
@@ -840,7 +1511,7 @@ class NumericalProblemTypeBase(ProblemTypeTestBase):
             textvalue = str(random.randint(-2, 2))
         self.problem_page.fill_answer(textvalue)
 
-
+@ddt.ddt
 class NumericalProblemTypeTest(NumericalProblemTypeBase, ProblemTypeTestMixin):
     """
     Standard tests for the Numerical Problem Type
@@ -870,6 +1541,165 @@ class NumericalProblemTypeTest(NumericalProblemTypeBase, ProblemTypeTestMixin):
         self.problem_page.click_review_in_notification(notification_type='gentle-alert')
         self.problem_page.wait_for_focus_on_problem_meta()
 
+    def test_reset_numerical_problem(self):
+        """
+        Scenario: I can reset a problem
+
+        Given I am viewing a numerical problem with randomization: always and with reset button: on
+        And I answer a numerical problem correct/incorrect
+        When I reset the problem
+        Then my numerical answer is marked "unanswered"
+        And The numerical problem displays a "blank" answer
+        """
+        self.answer_problem('incorrect')
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+    @ddt.data(['correct', '1/1 point (ungraded)'], ['incorrect', '0/1 point (ungraded)'])
+    @ddt.unpack
+    def test_numerical_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a radio problem when I answer it and after I reset it
+
+        Given I am viewing a numerical problem
+        When I answer a numerical problem correct/incorrect
+        Then I should see a score
+        When I reset the problem
+        Then I should see a score of points possible: 1/1 point (ungraded) -- 0/1 point (ungraded)
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/1 point (ungraded)')
+
+    @ddt.data(['correct', 'incorrect'], ['incorrect', 'correct'])
+    @ddt.unpack
+    def test_reset_correctness_after_changing_answer(self, initial_correctness, other_correctness):
+        """
+        Scenario: I can reset the correctness of a problem after changing my answer
+
+        Given I am viewing a numerical problem
+        Then my numerical problem's answer is marked "unanswered"
+        When I answer a numerical problem inital correctness
+        And I input an answer on a numerical problem other correctness
+        Then my numerical problem answer is marked "unanswered"
+        And I reset the problem
+        """
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+        self.answer_problem(initial_correctness)
+        self.problem_page.click_submit()
+
+        self.wait_for_status(initial_correctness)
+        self.assertTrue(self.is_status_true(initial_correctness))
+
+        self.answer_problem(other_correctness)
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+        self.problem_page.click_reset()
+
+
+@ddt.ddt
+class NumericalProblemTypeTestNonRandomized(NumericalProblemTypeBase, ProblemTypeTestMixin):
+    """
+    Standard tests for the Multiple Radio Problem Type
+    """
+
+    def get_problem(self):
+        """
+        Creates a {problem_type} problem
+        """
+        # Generate the problem XML using capa.tests.response_xml_factory
+        return XBlockFixtureDesc(
+            'problem',
+            self.problem_name,
+            data=self.factory.build_xml(**self.factory_kwargs),
+            metadata={'rerandomize': 'never', 'show_reset_button': True}
+        )
+
+    def test_non_randomized_numerical_problem_incorrectly(self):
+        """
+        Scenario: I can reset a non-randomized numerical problem that I answered incorrectly
+
+        Given I am viewing a numerical problem with randomization: never and with reset button: on
+        And I answer a numerical problem incorrectly
+        When I reset the problem
+        Then my a numerical problem answer is marked "unanswered"
+        And The a numerical problem problem displays a "blank" answer
+        """
+        self.answer_problem("incorrect")
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+    def test_non_randomized_numerical_problem_correctly(self):
+        """
+        Scenario: The reset button doesn't show up
+
+        Given I am viewing a numerical problem with randomization: never and with reset button: on
+        And I answer a numerical problem problem problem correctly
+        Then The "Reset" button does not appear
+        """
+        self.answer_problem("correct")
+        self.problem_page.click_submit()
+        self.assertFalse(self.problem_page.is_reset_button_present())
+
+    @skip('This can not be implemented')
+    # With randomization as never, there is no way learner can reset the problem
+    # after answering the problem correctly. The test is not implemented correctly
+    # in lettuce either. In lettuce, the first step calls the wrong method, which
+    # just creates a problem without changing the randomization setting.
+    @ddt.data(['correct', '1/1 point (ungraded)'], ['incorrect', '0/1 point (ungraded)'])
+    @ddt.unpack
+    def test_numerical_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a numerical problem when I answer it and after I reset it
+
+        Given I am viewing numerical problem with randomization: never and with reset button: on
+        When I answer a numerical problem correct/incorrect
+        Then I should see a score
+        When I reset the problem
+        Then I should see a score of possible points
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/1 point (ungraded)')
+
+
+class NumericalProblemTypeTestViewAnswer(NumericalProblemTypeBase, ProblemTypeTestMixin):
+    """
+    Standard tests for the Numerical Problem Type
+    """
+
+    def get_problem(self):
+        """
+        Creates a {problem_type} problem
+        """
+        # Generate the problem XML using capa.tests.response_xml_factory
+        return XBlockFixtureDesc(
+            'problem',
+            self.problem_name,
+            data=self.factory.build_xml(**self.factory_kwargs),
+            metadata={'showanswer': 'always'}
+        )
+
+    def test_learner_can_view_answer(self):
+        """
+        Scenario: I can view the answer if the problem has it:
+
+        Given I am viewing a "numerical" that shows the answer "always"
+        When I press the button with the label "Show Answer"
+        And I should see "4.14159" somewhere in the page
+        """
+        self.problem_page.click_show()
+        self.assertEqual(self.problem_page.answer, '4.14159')
+
 
 class NumericalProblemTypeNeverShowCorrectnessTest(NumericalProblemTypeBase, ProblemNeverShowCorrectnessMixin):
     """
@@ -877,7 +1707,7 @@ class NumericalProblemTypeNeverShowCorrectnessTest(NumericalProblemTypeBase, Pro
     """
     pass
 
-
+@ddt.ddt
 class FormulaProblemTypeBase(ProblemTypeTestBase):
     """
     ProblemTypeTestBase specialization for Formula Problem Type
@@ -904,6 +1734,29 @@ class FormulaProblemTypeBase(ProblemTypeTestBase):
         'submitted': ['div.submitted'],
     }
 
+    def wait_for_status(self, status):
+        """
+        Waits for the expected status indicator.
+
+        Args:
+            status: one of ("correct", "incorrect", "unanswered", "submitted")
+        """
+        msg = "Wait for status to be {}".format(status)
+        selector = ', '.join(self.status_indicators[status])
+        self.problem_page.wait_for_element_visibility(selector, msg)
+
+    def is_status_true(self, status):
+        """
+        Returns the status of problem
+        Args:
+            status(string): status of the problem which is to be checked
+
+        Returns:
+            True: If provided status is present on the page
+        """
+        selector = ', '.join(self.status_indicators[status])
+        return self.problem_page.is_present(selector)
+
     def answer_problem(self, correctness):
         """
         Answer formula problem.
@@ -912,11 +1765,140 @@ class FormulaProblemTypeBase(ProblemTypeTestBase):
         self.problem_page.fill_answer(textvalue)
 
 
+@ddt.ddt
 class FormulaProblemTypeTest(FormulaProblemTypeBase, ProblemTypeTestMixin):
     """
     Standard tests for the Formula Problem Type
     """
-    pass
+    @ddt.data('correct', 'incorrect')
+    def test_reset_formula_problem(self, correctness):
+        """
+        Scenario: I can reset a problem
+
+        Given I am viewing a formula problem with randomization: always and with reset button: on
+        And I answer a formula problem correct/incorrect
+        When I reset the problem
+        Then my formula answer is marked "unanswered"
+        And The formula problem displays a "blank" answer
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+    @ddt.data(['correct', '1/1 point (ungraded)'], ['incorrect', '0/1 point (ungraded)'])
+    @ddt.unpack
+    def test_formula_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a formula problem when I answer it and after I reset it
+
+        Given I am viewing a formlua problem
+        When I answer a formula problem correct/incorrect
+        Then I should see a score
+        When I reset the problem
+        Then I should see a score of points possible: 1/1 point (ungraded) -- 0/1 point (ungraded)
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/1 point (ungraded)')
+
+    @ddt.data(['correct', 'incorrect'], ['incorrect', 'correct'])
+    @ddt.unpack
+    def test_reset_correctness_after_changing_answer(self, initial_correctness, other_correctness):
+        """
+        Scenario: I can reset the correctness of a problem after changing my answer
+
+        Given I am viewing a formula problem
+        Then my formula problem's answer is marked "unanswered"
+        When I answer a formula problem inital correctness
+        And I input an answer on a formula problem other correctness
+        Then my formula problem answer is marked "unanswered"
+        And I reset the problem
+        """
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+        self.answer_problem(initial_correctness)
+        self.problem_page.click_submit()
+
+        self.wait_for_status(initial_correctness)
+        self.assertTrue(self.is_status_true(initial_correctness))
+
+        self.answer_problem(other_correctness)
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+        self.problem_page.click_reset()
+
+
+class FormulaProblemTypeTestNonRandomized(FormulaProblemTypeBase, ProblemTypeTestMixin):
+    """
+    Standard tests for the Multiple Radio Problem Type
+    """
+
+    def get_problem(self):
+        """
+        Creates a {problem_type} problem
+        """
+        # Generate the problem XML using capa.tests.response_xml_factory
+        return XBlockFixtureDesc(
+            'problem',
+            self.problem_name,
+            data=self.factory.build_xml(**self.factory_kwargs),
+            metadata={'rerandomize': 'never', 'show_reset_button': True}
+        )
+
+    def test_non_randomized_formula_problem_incorrectly(self):
+        """
+        Scenario: I can reset a non-randomized formula problem that I answered incorrectly
+
+        Given I am viewing a formula problem with randomization: never and with reset button: on
+        And I answer a formula problem incorrectly
+        When I reset the problem
+        Then my a formula problem answer is marked "unanswered"
+        And The a formula problem problem displays a "blank" answer
+        """
+        self.answer_problem("incorrect")
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+    def test_non_randomized_formula_problem_correctly(self):
+        """
+        Scenario: The reset button doesn't show up
+
+        Given I am viewing a formula problem with randomization: never and with reset button: on
+        And I answer a formula problem problem problem correctly
+        Then The "Reset" button does not appear
+        """
+        self.answer_problem("correct")
+        self.problem_page.click_submit()
+        self.assertFalse(self.problem_page.is_reset_button_present())
+
+    @skip('This can not be implemented')
+    # With randomization as never, there is no way learner can reset the problem
+    # after answering the problem correctly. The test is not implemented correctly
+    # in lettuce either. In lettuce, the first step calls the wrong method, which
+    # just creates a problem without changing the randomization setting.
+    @ddt.data(['correct', '1/1 point (ungraded)'], ['incorrect', '0/1 point (ungraded)'])
+    @ddt.unpack
+    def test_formula_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a formula problem when I answer it and after I reset it
+
+        Given I am viewing formula problem with randomization: never and with reset button: on
+        When I answer a formula problem correct/incorrect
+        Then I should see a score
+        When I reset the problem
+        Then I should see a score of possible points
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.score_notification, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/1 point (ungraded)')
 
 
 class FormulaProblemTypeNeverShowCorrectnessTest(FormulaProblemTypeBase, ProblemNeverShowCorrectnessMixin):
@@ -926,6 +1908,7 @@ class FormulaProblemTypeNeverShowCorrectnessTest(FormulaProblemTypeBase, Problem
     pass
 
 
+@ddt.ddt
 class ScriptProblemTypeBase(ProblemTypeTestBase):
     """
     ProblemTypeTestBase specialization for Script Problem Type
@@ -961,6 +1944,29 @@ class ScriptProblemTypeBase(ProblemTypeTestBase):
         'submitted': ['div.submitted'],
     }
 
+    def wait_for_status(self, status):
+        """
+        Waits for the expected status indicator.
+
+        Args:
+            status: one of ("correct", "incorrect", "unanswered", "submitted")
+        """
+        msg = "Wait for status to be {}".format(status)
+        selector = ', '.join(self.status_indicators[status])
+        self.problem_page.wait_for_element_visibility(selector, msg)
+
+    def is_status_true(self, status):
+        """
+        Returns the status of problem
+        Args:
+            status(string): status of the problem which is to be checked
+
+        Returns:
+            True: If provided status is present on the page
+        """
+        selector = ', '.join(self.status_indicators[status])
+        return self.problem_page.is_present(selector)
+
     def answer_problem(self, correctness):
         """
         Answer script problem.
@@ -978,11 +1984,125 @@ class ScriptProblemTypeBase(ProblemTypeTestBase):
         self.problem_page.fill_answer(second_addend, input_num=1)
 
 
+@ddt.ddt
 class ScriptProblemTypeTest(ScriptProblemTypeBase, ProblemTypeTestMixin):
     """
     Standard tests for the Script Problem Type
     """
-    pass
+
+    @ddt.data('correct', 'incorrect')
+    def test_reset_script_problem(self, correctness):
+        """
+        Scenario: I can reset a problem
+
+        Given I am viewing a script problem with randomization: always and with reset button: on
+        And I answer a script problem correct/incorrect
+        When I reset the problem
+        Then my script answer is marked "unanswered"
+        And The script problem displays a "blank" answer
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+    @ddt.data(['correct', '2/2 points (ungraded)'], ['incorrect', '0/2 points (ungraded)'])
+    @ddt.unpack
+    def test_script_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a script problem when I answer it and after I reset it
+
+        Given I am viewing a script problem
+        When I answer a script problem correct/incorrect
+        Then I should see a score
+        When I reset the problem
+        Then I should see a score of points possible: 1/1 point (ungraded) -- 0/1 point (ungraded)
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/2 points (ungraded)')
+
+    @ddt.data(['correct', 'incorrect'], ['incorrect', 'correct'])
+    @ddt.unpack
+    def test_reset_correctness_after_changing_answer(self, initial_correctness, other_correctness):
+        """
+        Scenario: I can reset the correctness of a problem after changing my answer
+
+        Given I am viewing a script problem
+        Then my script problem's answer is marked "unanswered"
+        When I answer a script problem inital correctness
+        And I input an answer on a script problem other correctness
+        Then my script problem answer is marked "unanswered"
+        And I reset the problem
+        """
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+        self.answer_problem(initial_correctness)
+        self.problem_page.click_submit()
+
+        self.wait_for_status(initial_correctness)
+        self.assertTrue(self.is_status_true(initial_correctness))
+
+        self.answer_problem(other_correctness)
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+        self.problem_page.click_reset()
+
+
+class ScriptProblemTypeTestNonRandomized(ScriptProblemTypeBase, ProblemTypeTestMixin):
+    """
+    Standard tests for the Multiple Radio Problem Type
+    """
+
+    def get_problem(self):
+        """
+        Creates a {problem_type} problem
+        """
+        # Generate the problem XML using capa.tests.response_xml_factory
+        return XBlockFixtureDesc(
+            'problem',
+            self.problem_name,
+            data=self.factory.build_xml(**self.factory_kwargs),
+            metadata={'rerandomize': 'never', 'show_reset_button': True}
+        )
+
+    def test_non_randomized_script_problem_correctly(self):
+        """
+        Scenario: The reset button doesn't show up
+
+        Given I am viewing a script problem with randomization: never and with reset button: on
+        And I answer a script problem problem problem correctly
+        Then The "Reset" button does not appear
+        """
+        self.answer_problem("correct")
+        self.problem_page.click_submit()
+        self.assertFalse(self.problem_page.is_reset_button_present())
+
+    @skip('This can not be implemented')
+    # With randomization as never, there is no way learner can reset the problem
+    # after answering the problem correctly. The test is not implemented correctly
+    # in lettuce either. In lettuce, the first step calls the wrong method, which
+    # just creates a problem without changing the randomization setting.
+    @ddt.data(['correct', '2/2 point (ungraded)'], ['incorrect', '0/2 point (ungraded)'])
+    @ddt.unpack
+    def test_script_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a script problem when I answer it and after I reset it
+
+        Given I am viewing script problem with randomization: never and with reset button: on
+        When I answer a script problem correct/incorrect
+        Then I should see a score
+        When I reset the problem
+        Then I should see a score of possible points
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.score_notification, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/2 point (ungraded)')
 
 
 class ScriptProblemTypeNeverShowCorrectnessTest(ScriptProblemTypeBase, ProblemNeverShowCorrectnessMixin):
@@ -1162,6 +2282,29 @@ class RadioTextProblemTypeBase(ChoiceTextProblemTypeTestBase):
         'submitted': ['section.choicetextgroup_submitted', 'span.submitted'],
     }
 
+    def wait_for_status(self, status):
+        """
+        Waits for the expected status indicator.
+
+        Args:
+            status: one of ("correct", "incorrect", "unanswered", "submitted")
+        """
+        msg = "Wait for status to be {}".format(status)
+        selector = ', '.join(self.status_indicators[status])
+        self.problem_page.wait_for_element_visibility(selector, msg)
+
+    def is_status_true(self, status):
+        """
+        Returns the status of problem
+        Args:
+            status(string): status of the problem which is to be checked
+
+        Returns:
+            True: If provided status is present on the page
+        """
+        selector = ', '.join(self.status_indicators[status])
+        return self.problem_page.is_present(selector)
+
     def setUp(self, *args, **kwargs):
         """
         Additional setup for RadioTextProblemTypeBase
@@ -1177,11 +2320,74 @@ class RadioTextProblemTypeBase(ChoiceTextProblemTypeTestBase):
         })
 
 
+@ddt.ddt
 class RadioTextProblemTypeTest(RadioTextProblemTypeBase, ProblemTypeTestMixin):
     """
     Standard tests for the Radio Text Problem Type
     """
-    pass
+
+    @ddt.data('correct', 'incorrect')
+    def test_reset_radio_text_problem(self, correctness):
+        """
+        Scenario: I can reset a problem
+
+        Given I am viewing a radio text problem with randomization: always and with reset button: on
+        And I answer a radio text problem correct/incorrect
+        When I reset the problem
+        Then my radio text answer is marked "unanswered"
+        And The radio text problem displays a "blank" answer
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+
+class RadioTextProblemTypeTestNonRandomized(RadioTextProblemTypeBase, ProblemTypeTestMixin):
+    """
+    Standard tests for the Multiple Radio Problem Type
+    """
+
+    def get_problem(self):
+        """
+        Creates a {problem_type} problem
+        """
+        # Generate the problem XML using capa.tests.response_xml_factory
+        return XBlockFixtureDesc(
+            'problem',
+            self.problem_name,
+            data=self.factory.build_xml(**self.factory_kwargs),
+            metadata={'rerandomize': 'never', 'show_reset_button': True}
+        )
+
+    def test_non_randomized_radio_text_problem_incorrectly(self):
+        """
+        Scenario: I can reset a non-randomized radio text problem that I answered incorrectly
+
+        Given I am viewing a radio text problem with randomization: never and with reset button: on
+        And I answer a radio text problem incorrectly
+        When I reset the problem
+        Then my a radio text problem answer is marked "unanswered"
+        And The a radio text problem problem displays a "blank" answer
+        """
+        self.answer_problem("incorrect")
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+    def test_non_randomized_radio_text_problem_correctly(self):
+        """
+        Scenario: The reset button doesn't show up
+
+        Given I am viewing a radio text problem with randomization: never and with reset button: on
+        And I answer a radio text problem problem problem correctly
+        Then The "Reset" button does not appear
+        """
+        self.answer_problem("correct")
+        self.problem_page.click_submit()
+        self.assertFalse(self.problem_page.is_reset_button_present())
 
 
 class RadioTextProblemTypeNeverShowCorrectnessTest(RadioTextProblemTypeBase, ProblemNeverShowCorrectnessMixin):
@@ -1224,6 +2430,52 @@ class CheckboxTextProblemTypeBase(ChoiceTextProblemTypeTestBase):
                 'section',  # TODO: AC-491
             ]
         })
+
+
+class CheckboxTextProblemTypeTestNonRandomized(CheckboxTextProblemTypeBase, ProblemTypeTestMixin):
+    """
+    Standard tests for the Multiple Radio Problem Type
+    """
+
+    def get_problem(self):
+        """
+        Creates a {problem_type} problem
+        """
+        # Generate the problem XML using capa.tests.response_xml_factory
+        return XBlockFixtureDesc(
+            'problem',
+            self.problem_name,
+            data=self.factory.build_xml(**self.factory_kwargs),
+            metadata={'rerandomize': 'never', 'show_reset_button': True}
+        )
+
+    def test_non_randomized_choice_text_problem_incorrectly(self):
+        """
+        Scenario: I can reset a non-randomized choice text problem that I answered incorrectly
+
+        Given I am viewing a choice text problem with randomization: never and with reset button: on
+        And I answer a choice text problem incorrectly
+        When I reset the problem
+        Then my a choice text problem answer is marked "unanswered"
+        And The a choice text problem problem displays a "blank" answer
+        """
+        self.answer_problem("incorrect")
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+    def test_non_randomized_checkbox_text_problem_correctly(self):
+        """
+        Scenario: The reset button doesn't show up
+
+        Given I am viewing a checkbox text problem with randomization: never and with reset button: on
+        And I answer a checkbox text problem problem problem correctly
+        Then The "Reset" button does not appear
+        """
+        self.answer_problem("correct")
+        self.problem_page.click_submit()
+        self.assertFalse(self.problem_page.is_reset_button_present())
 
 
 class CheckboxTextProblemTypeTest(CheckboxTextProblemTypeBase, ProblemTypeTestMixin):
@@ -1273,11 +2525,116 @@ class ImageProblemTypeBase(ProblemTypeTestBase):
         chain.perform()
 
 
+@ddt.ddt
 class ImageProblemTypeTest(ImageProblemTypeBase, ProblemTypeTestMixin):
     """
     Standard tests for the Image Problem Type
     """
-    pass
+
+    @ddt.data('correct', 'incorrect')
+    def test_reset_image_problem(self, correctness):
+        """
+        Scenario: I can reset a problem
+
+        Given I am viewing a image problem with randomization: always and with reset button: on
+        And I answer a image problem correct/incorrect
+        When I reset the problem
+        Then my image answer is marked "unanswered"
+        And The image problem displays a "blank" answer
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+    @ddt.data(['correct', '1/1 point (ungraded)'], ['incorrect', '0/1 point (ungraded)'])
+    @ddt.unpack
+    def test_image_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a script problem when I answer it and after I reset it
+
+        Given I am viewing a image problem
+        When I answer a image problem correct/incorrect
+        Then I should see a score
+        When I reset the problem
+        Then I should see a score of points possible: 1/1 point (ungraded) -- 0/1 point (ungraded)
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/1 point (ungraded)')
+
+    def test_image_problem_score_with_blank_answer(self):
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/1 point (ungraded)')
+
+
+class ImageProblemTypeTestNonRandomized(ImageProblemTypeBase, ProblemTypeTestMixin):
+
+    def get_problem(self):
+        """
+        Creates a {problem_type} problem
+        """
+        # Generate the problem XML using capa.tests.response_xml_factory
+        return XBlockFixtureDesc(
+            'problem',
+            self.problem_name,
+            data=self.factory.build_xml(**self.factory_kwargs),
+            metadata={'rerandomize': 'never', 'show_reset_button': True}
+        )
+
+    def test_non_randomized_image_problem_incorrectly(self):
+        """
+        Scenario: I can reset a non-randomized image problem that I answered incorrectly
+
+        Given I am viewing a image problem with randomization: never and with reset button: on
+        And I answer a image problem incorrectly
+        When I reset the problem
+        Then my a image problem answer is marked "unanswered"
+        And The a image problem problem displays a "blank" answer
+        """
+        self.answer_problem("incorrect")
+        self.problem_page.click_submit()
+        self.problem_page.click_reset()
+        self.wait_for_status('unanswered')
+        self.assertTrue(self.is_status_true('unanswered'))
+
+    def test_non_randomized_image_problem_correctly(self):
+        """
+        Scenario: The reset button doesn't show up
+
+        Given I am viewing a image text problem with randomization: never and with reset button: on
+        And I answer a image text problem problem problem correctly
+        Then The "Reset" button does not appear
+        """
+        self.answer_problem("correct")
+        self.problem_page.click_submit()
+        self.assertFalse(self.problem_page.is_reset_button_present())
+
+    @skip('This can not be implemented')
+    # With randomization as never, there is no way learner can reset the problem
+    # after answering the problem correctly. The test is not implemented correctly
+    # in lettuce either. In lettuce, the first step calls the wrong method, which
+    # just creates a problem without changing the randomization setting.
+    @ddt.data(['correct', '2/2 point (ungraded)'], ['incorrect', '0/2 point (ungraded)'])
+    @ddt.unpack
+    def test_image_score_after_answer_and_reset(self, correctness, score):
+        """
+        Scenario: I can see my score on a problem when I answer it and after I reset it
+
+        Given I am viewing image problem with randomization: never and with reset button: on
+        When I answer a image problem correct/incorrect
+        Then I should see a score of score
+        When I reset the problem
+        Then I should see a score of possible points
+        """
+        self.answer_problem(correctness)
+        self.problem_page.click_submit()
+        self.assertEqual(self.problem_page.score_notification, score)
+        self.problem_page.click_reset()
+        self.assertEqual(self.problem_page.problem_progress_graded_value, '0/2 point (ungraded)')
 
 
 class ImageProblemTypeNeverShowCorrectnessTest(ImageProblemTypeBase, ProblemNeverShowCorrectnessMixin):
