@@ -29,7 +29,6 @@
             extendedProfileFields,
             displayAccountDeletion,
             isSecondaryEmailFeatureEnabled,
-            isBetaLanguage,
             betaLanguage
         ) {
             var $accountSettingsElement, userAccountModel, userPreferencesModel, aboutSectionsData,
@@ -411,7 +410,6 @@
                     ordersTabSections: ordersSectionData
                 },
                 userPreferencesModel: userPreferencesModel,
-                isBetaLanguage: isBetaLanguage,
                 betaLanguage: betaLanguage,
                 platformName: platformName
             });

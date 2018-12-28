@@ -76,16 +76,14 @@ def account_settings_context(request):
         # it will be broken if exception raised
         user_orders = []
 
-    is_beta_language = False
-    user_language = {}
+    beta_language = {}
     dark_lang_config = DarkLangConfig.current()
     if dark_lang_config.enable_beta_languages:
         user_preferences = get_user_preferences(user)
         pref_language = user_preferences.get('pref-lang')
         if pref_language in dark_lang_config.beta_languages_list:
-            is_beta_language = True
-            user_language['code'] = pref_language
-            user_language['name'] = settings.LANGUAGE_DICT.get(pref_language)
+            beta_language['code'] = pref_language
+            beta_language['name'] = settings.LANGUAGE_DICT.get(pref_language)
 
     context = {
         'auth': {},
@@ -124,8 +122,7 @@ def account_settings_context(request):
             'ENABLE_ACCOUNT_DELETION', settings.FEATURES.get('ENABLE_ACCOUNT_DELETION', False)
         ),
         'extended_profile_fields': _get_extended_profile_fields(),
-        'is_beta_language': is_beta_language,
-        'beta_language': user_language
+        'beta_language': beta_language
     }
 
     enterprise_customer = get_enterprise_customer_for_learner(site=request.site, user=request.user)

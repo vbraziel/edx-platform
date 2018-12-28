@@ -52,10 +52,9 @@
             },
 
             render: function() {
-                var tabName, betaLangMessage, helpTranslateText, helpTranslateLink,
-                    betaLangCode = this.options.betaLanguage.code,
+                var tabName, betaLangMessage, helpTranslateText, helpTranslateLink, betaLangCode,
                     view = this;
-                if (view.options.isBetaLanguage) {
+                if (!_.isEmpty(view.options.betaLanguage)) {
                     betaLangMessage = HtmlUtils.interpolateHtml(
                         gettext('Your have set your language to {beta_language}, which is currently not fully translated. You can help us translate {platform_name} fully by joining the Transifex community and adding translations from English for learners that speak {beta_language}.'),  // eslint-disable-line max-len
                         {
@@ -69,7 +68,7 @@
                             beta_language: view.options.betaLanguage.name
                         }
                     );
-                    betaLangCode = betaLangCode.split("-");
+                    betaLangCode = this.options.betaLanguage.code.split("-");
                     betaLangCode = betaLangCode[0] + "_" + betaLangCode[1].toUpperCase();
                     helpTranslateLink = 'https://www.transifex.com/open-edx/edx-platform/translate/#' + betaLangCode
                 }
