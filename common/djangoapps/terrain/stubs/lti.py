@@ -77,8 +77,8 @@ class StubLtiHandler(StubHttpRequestHandler):
                         'sourcedId': self.post_dict.get('lis_result_sourcedid')
                     }
 
-                host = os.environ.get('BOK_CHOY_HOSTNAME', self.server.server_address[0])
-                # host = getattr(settings, 'LETTUCE_HOST', self.server.server_address[0])
+                # host = os.environ.get('BOK_CHOY_HOSTNAME', self.server.server_address[0])
+                host = getattr(settings, 'LETTUCE_HOST', self.server.server_address[0])
                 submit_url = '//{}:{}'.format(host, self.server.server_address[1])
                 content = self._create_content(status_message, submit_url)
                 self.send_response(200, content)
@@ -298,8 +298,8 @@ class StubLtiHandler(StubHttpRequestHandler):
         """
         client_secret = unicode(self.server.config.get('client_secret', self.DEFAULT_CLIENT_SECRET))
 
-        host = os.environ.get('BOK_CHOY_HOSTNAME', '127.0.0.1')
-        # host = getattr(settings, 'LETTUCE_HOST', '127.0.0.1')
+        # host = os.environ.get('BOK_CHOY_HOSTNAME', '127.0.0.1')
+        host = getattr(settings, 'LETTUCE_HOST', '127.0.0.1')
         port = self.server.server_address[1]
         lti_base = self.DEFAULT_LTI_ADDRESS.format(host=host, port=port)
         lti_endpoint = self.server.config.get('lti_endpoint', self.DEFAULT_LTI_ENDPOINT)
