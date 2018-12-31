@@ -75,24 +75,38 @@
     </section>
 </div>
 
-  % if page:
-        <link type="text/css" rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
-        <script src="//cdn.rawgit.com/botmonster/jquery-bootpag/master/lib/jquery.bootpag.min.js"></script>
-        <div class="text-center">
-        <p id="video_upload_pagination"></p>
-        </div>
-
-        <script>
-        $('#video_upload_pagination').bootpag({
-            total: "${paginator_context['total_pages']}",
-            page: "${paginator_context['current_page']}",
-            maxVisible: 10,
-            href: "?page={{number}}",
-            leaps: true,
-            next: 'next',
-            prev: 'previous',
-         });        
-    </script>
-  % endif
+% if page:
+    <link href="//cdn.bootcss.com/simplePagination.js/1.6/simplePagination.min.css" rel="stylesheet">
+    <script src="//cdn.bootcss.com/simplePagination.js/1.6/jquery.simplePagination.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jinplace/1.2.1/jinplace.min.js"></script>
+    
+    <div style="text-align: center">
+        <br>
+        <div id="video_upload_pagination" style="display: inline-block"></div>
+        <br>
+        <span id="records_per_page" 
+        data-ok-button="Go"
+        data-cancel-button='Cancel'
+        data-data="${paginator_context['items_on_one_page']}">
+         Click to change ${paginator_context['items_on_one_page']} videos per page setting.
+        </span>
+    </div>
+<script>
+    $(function() {
+        $('#video_upload_pagination').pagination({
+            pages: "${paginator_context['total_pages']}",
+            currentPage:"${paginator_context['current_page']}",
+            cssStyle: 'light-theme',
+            hrefTextPrefix:"?page=",
+        });
+        $('#records_per_page').jinplace({
+        }).on('jinplace:done',
+            function(ev, data) {
+                window.location = window.location.pathname;
+        });
+    });
+</script>
+    
+% endif
 
 </%block>

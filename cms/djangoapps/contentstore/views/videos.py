@@ -12,10 +12,11 @@ from uuid import uuid4
 import rfc6266_parser
 from boto import s3
 from django.conf import settings
+from django.shortcuts import redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.urls import reverse
-from django.http import HttpResponse, HttpResponseNotFound
+from django.http import HttpResponse, HttpResponseNotFound, HttpResponseRedirect
 from django.utils.translation import ugettext as _
 from django.utils.translation import ugettext_noop
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -85,6 +86,7 @@ VIDEO_UPLOAD_MAX_FILE_SIZE_GB = 5
 # maximum time for video to remain in upload state
 MAX_UPLOAD_HOURS = 24
 
+VIDEO_RECORDS_PER_PAGE = 10
 
 class TranscriptProvider(object):
     """
@@ -186,15 +188,18 @@ def videos_handler(request, course_key_string, edx_video_id=None):
             return videos_index_json(course)
         course_key = CourseKey.from_string(course_key_string)
         page = request.GET.get('page', 0) or ENABLE_VIDEO_UPLOAD_PAGINATION.is_enabled(course_key)
-        # True is waffle config, if page number is not specified 
-        return videos_index_html(course, int(page))
+        videos_per_page = request.session.get("VIDEO_RECORDS_PER_PAGE", VIDEO_RECORDS_PER_PAGE)  
+        return videos_index_html(course, int(page), videos_per_page)
     elif request.method == "DELETE":
         remove_video_for_course(course_key_string, edx_video_id)
         return JsonResponse()
+        
     else:
         if is_status_update_request(request.json):
             return send_video_status_update(request.json)
-
+        elif request.POST.get('id', '') ==  "records_per_page":
+            request.session['VIDEO_RECORDS_PER_PAGE'] = request.POST.get('value', VIDEO_RECORDS_PER_PAGE)
+            return JsonResponse()
         return videos_post(course, request)
 
 
@@ -489,7 +494,7 @@ def convert_video_status(video, is_video_encodes_ready=False):
     return status
 
 
-def _get_videos(course, page=0):
+def _get_videos(course, page=0, videos_per_page=VIDEO_RECORDS_PER_PAGE):
     """
     Retrieves the list of videos from VAL corresponding to this course.
     """
@@ -498,6 +503,7 @@ def _get_videos(course, page=0):
         VideoSortField.created,
         SortDirection.desc,
         page,
+        videos_per_page,
         )
     videos = list(videos)
 
@@ -532,7 +538,7 @@ def _get_default_video_image_url():
     return staticfiles_storage.url(settings.VIDEO_IMAGE_DEFAULT_FILENAME)
 
 
-def _get_index_videos(course, page=0):
+def _get_index_videos(course, page=0, videos_per_page=VIDEO_RECORDS_PER_PAGE):
     """
     Returns the information about each video upload required for the video list
     """
@@ -555,7 +561,7 @@ def _get_index_videos(course, page=0):
                 values[attr] = video[attr]
 
         return values
-    videos , paginator_context = _get_videos(course, page)
+    videos , paginator_context = _get_videos(course, page, videos_per_page)
     return [
         _get_values(video) for video in videos
     ] , paginator_context
@@ -586,13 +592,13 @@ def get_all_transcript_languages():
     return all_languages
 
 
-def videos_index_html(course, page=0):
+def videos_index_html(course, page=0, videos_per_page=VIDEO_RECORDS_PER_PAGE):
     """
     Returns an HTML page to display previous video uploads and allow new ones
     """
     
     is_video_transcript_enabled = VideoTranscriptEnabledFlag.feature_enabled(course.id)
-    previous_uploads , paginator_context = _get_index_videos(course, page)
+    previous_uploads , paginator_context = _get_index_videos(course, page, videos_per_page)
     context = {
         'context_course': course,
         'image_upload_url': reverse_course_url('video_images_handler', unicode(course.id)),
@@ -805,3 +811,4 @@ def is_status_update_request(request_data):
     Returns True if `request_data` contains status update else False.
     """
     return any('status' in update for update in request_data)
+
