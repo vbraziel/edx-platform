@@ -71,6 +71,8 @@
                     betaLangCode = this.options.betaLanguage.code.split("-");
                     betaLangCode = betaLangCode[0] + "_" + betaLangCode[1].toUpperCase();
                     helpTranslateLink = 'https://www.transifex.com/open-edx/edx-platform/translate/#' + betaLangCode
+
+                    $.cookie('focus_id', '#beta-language-message')
                 }
                 HtmlUtils.setHtml(this.$el, HtmlUtils.template(accountSettingsTemplate)({
                     accountSettingsTabs: this.accountSettingsTabs,
